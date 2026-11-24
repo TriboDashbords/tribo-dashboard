@@ -156,7 +156,7 @@
   .kpis2 .v { font-size: 20px; font-weight: 700; }
   .kpis2 small { font-size: 12px; font-weight: 400; color: var(--text-2); }
   .meta { margin-top: 12px; font-size: 12px; color: var(--text-2); }
-  .pfpie { position: relative; height: 230px; max-width: 280px; margin: 4px auto 14px; }
+  .pfpie { position: relative; height: 290px; max-width: 420px; margin: 4px auto 10px; }
   .pfpie .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
   .pfpie .center .v { font-size: 18px; font-weight: 700; }
   .pfpie .center .l { font-size: 11px; color: var(--muted); }
@@ -176,6 +176,10 @@
   .gbar { display: block; height: 8px; background: var(--line); border-radius: 4px; margin: 6px 0 2px; overflow: hidden; }
   .gbar i { display: block; height: 100%; background: var(--bar); border-radius: 4px; }
   .cg { padding-left: 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 14px; font-size: 12px; color: var(--text-2); }
+  .lg { display: inline-flex; align-items: center; gap: 5px; }
+  .lg i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .lg b { color: var(--text); font-weight: 600; }
   .cg-row { padding: 8px 2px; font-size: 14px; }
 </style>
 </head>
@@ -609,6 +613,9 @@
     var t = d.totals.f;
     var h = '<h2>Групи продуктів</h2><div class="pfpie"><canvas id="pfPie" role="img" aria-label="Кругова діаграма продажів за групами"></canvas>' +
       '<div class="center"><div class="v num">' + tys(t) + '</div><div class="l">тис. грн</div></div></div>';
+    h += '<div class="legend">' + pfSlices(d).map(function (x) {
+      return '<span class="lg"><i style="background:' + x.color + '"></i>' + esc(x.n.replace(/^\([\d.]+\)\s*-?\s*/, '')) + ' <b class="num">' + pct(x.f, t) + '</b></span>';
+    }).join('') + '</div>';
     h += '<div class="thead"><span>Група</span><span>тис. грн · рентаб.</span></div>';
     d.groups.forEach(function (g, i) {
       var open = !!PF.gopen[g.n];
@@ -620,26 +627,49 @@
     });
     return h + '<div class="muted small">Рентабельність = маржинальний прибуток / собівартість</div>';
   }
+  function pfSlices(d) {
+    var t = d.totals.f, main = d.groups.filter(function (g, i) { return i < 8 && g.f / t >= 0.03; });
+    var other = t - main.reduce(function (s, g) { return s + g.f; }, 0);
+    var sl = main.map(function (g) { return { n: g.n, f: g.f, color: pfColor(d, g.n) }; });
+    if (other > 0.5) sl.push({ n: 'Інше', f: other, color: cssVar('--other') });
+    return sl;
+  }
+  function shortName(n) { n = n.replace(/^\([\d.]+\)\s*-?\s*/, ''); return n.length > 18 ? n.slice(0, 17) + '…' : n; }
   function drawPFPie(d) {
     if (PF.chart) { PF.chart.destroy(); PF.chart = null; }
     if (!window.Chart) return;
-    var t = d.totals.f, main = d.groups.filter(function (g, i) { return i < 8 && g.f / t >= 0.05; });
-    var other = t - main.reduce(function (s, g) { return s + g.f; }, 0);
-    var labels = main.map(function (g) { return g.n; }), data = main.map(function (g) { return g.f; }), colors = main.map(function (g) { return pfColor(d, g.n); });
-    if (other > 0.5) { labels.push('Інше'); data.push(other); colors.push(cssVar('--other')); }
+    var t = d.totals.f, sl = pfSlices(d), ink = cssVar('--text-2'), line = cssVar('--muted');
+    var wide = document.getElementById('pfPie').parentNode.clientWidth >= 400; // на телефоні — лише %, назви в легенді
     PF.chart = new Chart(document.getElementById('pfPie'), {
       type: 'doughnut',
-      data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderColor: cssVar('--surface'), borderWidth: 3, borderRadius: 4, hoverOffset: 6 }] },
-      options: { cutout: '62%', responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+      data: { labels: sl.map(function (x) { return x.n; }), datasets: [{ data: sl.map(function (x) { return x.f; }), backgroundColor: sl.map(function (x) { return x.color; }), borderColor: cssVar('--surface'), borderWidth: 3, borderRadius: 4, hoverOffset: 6 }] },
+      options: { cutout: '58%', responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+        layout: { padding: wide ? { left: 96, right: 96, top: 22, bottom: 22 } : { left: 34, right: 34, top: 24, bottom: 24 } },
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return ' ' + c.label + ': ' + tys(c.raw) + ' тис. грн (' + pct(c.raw, t) + ')'; } } } },
         onClick: function (e, els) {
-          if (!els.length || labels[els[0].index] === 'Інше') return;
-          var n = labels[els[0].index]; PF.gopen[n] = true; document.getElementById('pfgroups').innerHTML = pfGroupsHtml(d); drawPFPie(d);
+          if (!els.length) return;
+          var n = sl[els[0].index].n; if (n === 'Інше') return;
+          PF.gopen[n] = true; document.getElementById('pfgroups').innerHTML = pfGroupsHtml(d); drawPFPie(d);
           var el = document.querySelector('#pfgroups [data-g="' + CSS.escape(n) + '"]'); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         } },
-      plugins: [{ id: 'pfPct', afterDatasetsDraw: function (ch) {
-        var ctx = ch.ctx; ctx.save(); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ch.getDatasetMeta(0).data.forEach(function (a, i) { var s = data[i] / t; if (s < 0.07) return; var p = a.tooltipPosition(); ctx.fillText(Math.round(s * 100) + '%', p.x, p.y); });
+      plugins: [{ id: 'pfLabels', afterDatasetsDraw: function (ch) {
+        var ctx = ch.ctx, meta = ch.getDatasetMeta(0), lastY = { l: -99, r: -99 };
+        ctx.save();
+        meta.data.forEach(function (a, i) {
+          var s = sl[i].f / t; if (s < 0.025) return;
+          var mid = (a.startAngle + a.endAngle) / 2, cos = Math.cos(mid), sin = Math.sin(mid);
+          var x1 = a.x + cos * a.outerRadius, y1 = a.y + sin * a.outerRadius;
+          var right = cos >= 0, side = right ? 'r' : 'l';
+          var y2 = a.y + sin * (a.outerRadius + 14);
+          var gap = wide ? 26 : 15; if (Math.abs(y2 - lastY[side]) < gap) y2 = lastY[side] + (sin >= 0 ? gap : -gap);
+          lastY[side] = y2;
+          var x2 = a.x + cos * (a.outerRadius + 10), x3 = right ? x2 + 8 : x2 - 8;
+          ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y2); ctx.stroke();
+          ctx.textAlign = right ? 'left' : 'right'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = ink; ctx.font = '600 11px system-ui, sans-serif';
+          ctx.fillText(Math.round(s * 100) + '%', right ? x3 + 3 : x3 - 3, wide ? y2 - 7 : y2);
+          if (wide) { ctx.font = '11px system-ui, sans-serif'; ctx.fillText(shortName(sl[i].n), right ? x3 + 3 : x3 - 3, y2 + 7); }
+        });
         ctx.restore(); } }]
     });
   }
@@ -657,7 +687,7 @@
         '<span class="rk">' + (d.clients.indexOf(c) + 1) + '</span><span class="nm">' + esc(c.n) +
         (c.rg && c.rg !== 'Украина' ? ' <span class="badge">' + esc(c.rg) + '</span>' : '') +
         '<span class="gbar"><i style="width:' + Math.max(1.5, c.f / max * 100).toFixed(1) + '%"></i></span>' +
-        '<span class="sub">' + pct(c.f, t) + ' · рентаб. ' + rentTxt(c) + (c.debt > 0 ? ' · <span class="neg">борг ' + tys(c.debt) + '</span>' : '') + '</span></span>' +
+        '<span class="sub">' + pct(c.f, t) + ' · рентаб. ' + rentTxt(c) + '</span></span>' +
         '<span class="vals num"><b>' + tys(c.f) + '</b></span><span class="caret">' + (open ? '▾' : '▸') + '</span></button>';
       if (open) {
         c.g.forEach(function (g) {

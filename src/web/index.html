@@ -138,6 +138,45 @@
   .loading { text-align: center; padding: 40px 0; color: var(--muted); }
   .err { white-space: pre-wrap; }
   @media (min-width: 720px) { .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .two .card { margin-bottom: 0; } }
+  /* Стиль у дусі Дії: мінімалізм, м'які градієнти, чорні «таблетки» */
+  :root { --grad: linear-gradient(135deg, #d6eaff 0%, #e4dcff 48%, #ffe1ea 100%); --bar: linear-gradient(90deg, #7db4ff, #b39dff 60%, #ff9ec0); --pill: #0b0b0b; --pill-ink: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --grad: linear-gradient(135deg, #1d2a3d 0%, #29233d 50%, #3a2430 100%); --bar: linear-gradient(90deg, #3f78c9, #7b63d6 60%, #c85a85); --pill: #f0efec; --pill-ink: #111; } }
+  body { font-family: "e-Ukraine", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  .card { border-radius: 22px; border-color: transparent; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .card.grad { background: var(--grad); }
+  .grad .label, .grad .unit, .grad .l { color: var(--text-2); }
+  .chip { border-radius: 999px; }
+  .chip[aria-pressed="true"], .tab[aria-pressed="true"] { background: var(--pill); border-color: var(--pill); color: var(--pill-ink); }
+  .grad .chip { background: rgba(255,255,255,.55); border-color: transparent; }
+  .grad .chip[aria-pressed="true"] { background: var(--pill); }
+  .tabs { border-radius: 999px; border-color: transparent; }
+  .tab { border-radius: 999px; }
+  .kpis2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .kpis2 .l { font-size: 12px; }
+  .kpis2 .v { font-size: 20px; font-weight: 700; }
+  .kpis2 small { font-size: 12px; font-weight: 400; color: var(--text-2); }
+  .meta { margin-top: 12px; font-size: 12px; color: var(--text-2); }
+  .pfpie { position: relative; height: 230px; max-width: 280px; margin: 4px auto 14px; }
+  .pfpie .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .pfpie .center .v { font-size: 18px; font-weight: 700; }
+  .pfpie .center .l { font-size: 11px; color: var(--muted); }
+  .thead { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding: 0 2px 6px; }
+  .row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 11px 2px; color: inherit; font: inherit; cursor: pointer; }
+  .row .nm { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .row .sw { flex: 0 0 10px; margin: 0; }
+  .sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .vals { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; font-size: 12px; color: var(--muted); }
+  .vals b { font-size: 15px; color: var(--text); font-weight: 650; }
+  .row .caret { color: var(--muted); width: 12px; }
+  .rk { flex: 0 0 auto; min-width: 18px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .cl.open { background: var(--bg); border-radius: 14px; }
+  .its { padding: 0 6px 8px 22px; }
+  .it { display: flex; gap: 8px; align-items: flex-start; border-top: 1px dashed var(--line); padding: 8px 2px; font-size: 14px; }
+  .it .nm { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .gbar { display: block; height: 8px; background: var(--line); border-radius: 4px; margin: 6px 0 2px; overflow: hidden; }
+  .gbar i { display: block; height: 100%; background: var(--bar); border-radius: 4px; }
+  .cg { padding-left: 14px; }
+  .cg-row { padding: 8px 2px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -509,149 +548,153 @@
     var hasPF = S.init && S.init.planfactMonths && S.init.planfactMonths.length;
     if (!hasPF) { el.innerHTML = ''; return; }
     el.innerHTML = '<button class="tab" data-t="sales" aria-pressed="' + (S.tab !== 'pf') + '">Продажі</button>' +
-      '<button class="tab" data-t="pf" aria-pressed="' + (S.tab === 'pf') + '">План-факт</button>';
+      '<button class="tab" data-t="pf" aria-pressed="' + (S.tab === 'pf') + '">Маржа</button>';
     Array.prototype.forEach.call(el.querySelectorAll('.tab'), function (b) {
       b.onclick = function () { var t = b.getAttribute('data-t'); if (t === S.tab) return; S.tab = t; lsSet('tribo_tab', t); render(); window.scrollTo(0, 0); };
     });
   }
 
-  /* ===================== План-факт ===================== */
-  var PF = { month: null, cache: {}, sort: 'f', open: {}, copen: {}, cfull: {}, q: '', showAll: false };
-  var MONTHS_SHORT = ['січ', 'лют', 'бер', 'кві', 'тра', 'чер', 'лип', 'сер', 'вер', 'жов', 'лис', 'гру'];
+  /* ===================== Маржа (звіт план-факт, лише факт) ===================== */
+  var PF = { month: null, cache: {}, gopen: {}, copen: {}, cgopen: {}, q: '', showAll: false, chart: null, otherOpen: false };
   function monthLabel(ym) { return MONTHS[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4); }
   function rent(o) { return o.c ? o.pr / o.c * 100 : null; }
-  function execPct(o) { return o.p ? o.f / o.p * 100 : null; }
-  function pctTxt(x) { return x === null ? '—' : fmt1.format(x) + ' %'; }
-  var SORTS = { f: ['Факт', function (o) { return o.f; }], p: ['План', function (o) { return o.p; }],
-    pr: ['Прибуток', function (o) { return o.pr; }], r: ['Рентаб.', function (o) { var r = rent(o); return r === null ? -1e9 : r; }],
-    e: ['Виконання', function (o) { var e = execPct(o); return e === null ? -1e9 : e; }] };
-  function sorted(arr) { var k = SORTS[PF.sort][1]; return arr.slice().sort(function (a, b) { return k(b) - k(a) || b.f - a.f; }); }
+  function rentTxt(o) { var r = rent(o); return r === null ? '—' : fmt1.format(r) + ' %'; }
+  function qtyTxt(it) { return it.q ? fmtQ.format(it.q) + (it.u ? ' ' + it.u : '') : '—'; }
+  function dt(s) { var d = new Date(s); return isNaN(d) ? '' : ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function pfColor(d, name) { var i = d.groupOrder.indexOf(name); return i >= 0 && i < 8 ? cssVar('--s' + (i + 1)) : cssVar('--other'); }
 
   function renderPF() {
     var months = S.init.planfactMonths;
     if (!PF.month || months.indexOf(PF.month) < 0) PF.month = months[0];
     var d = PF.cache[PF.month];
-    var h = '<section class="card hero"><div class="chips" id="pfchips" role="group" aria-label="Місяць">';
+    var h = '<section class="card hero grad">';
+    h += '<div class="chips" id="pfchips" role="group" aria-label="Місяць">';
     months.slice().reverse().forEach(function (m) { h += '<button class="chip" data-m="' + m + '" aria-pressed="' + (m === PF.month) + '">' + esc(monthLabel(m)) + '</button>'; });
     h += '</div>';
     if (!d) {
-      app.innerHTML = h + '</section><div class="loading">Завантаження…</div>'; bindPFChips();
+      app.innerHTML = h + '<div class="loading">Завантаження…</div></section>'; bindPFChips();
       call('apiPlanFact', PF.month).then(function (x) { PF.cache[x.month] = x; if (S.tab === 'pf') render(); }).catch(showError);
       return;
     }
-    var t = d.totals, ex = execPct(t);
-    h += '<div class="kpis">' +
-      kpi('Факт', tys(t.f), 'тис. грн') + kpi('План', tys(t.p), 'тис. грн') +
-      kpi('Виконання', ex === null ? '—' : fmt1.format(ex) + ' %', '') +
-      kpi('Прибуток факт', tys(t.pr), 'тис. грн') + kpi('Рентабельність', pctTxt(rent(t)), 'прибуток / собівартість') +
-      '</div>';
-    if (ex !== null) h += '<div class="pbar" title="Виконання плану"><i style="width:' + Math.min(100, ex).toFixed(1) + '%"></i></div>';
-    if (d.control !== null && d.control !== undefined) {
-      h += Math.abs(d.control - t.f) > 2
-        ? '<div class="status bad" role="alert"><span aria-hidden="true">⚠</span><div><b>Розбіжність:</b> факт ' + tys(t.f) + ' ≠ «Общий итог» 1С ' + tys(d.control) + ' тис. грн</div></div>'
-        : '<div class="status good"><span aria-hidden="true">✓</span><div>Факт = «Общий итог» звіту 1С</div></div>';
-    }
+    var t = d.totals;
+    h += '<div class="label">Сума продажів, без ПДВ</div><div class="big num">' + tys(t.f) + '</div><div class="unit">тис. грн</div>';
+    h += '<div class="kpis2"><div><div class="l">Маржинальний прибуток</div><div class="v num">' + tys(t.pr) + ' <small>тис. грн</small></div></div>' +
+      '<div><div class="l">Рентабельність</div><div class="v num">' + rentTxt(t) + '</div></div></div>';
+    h += '<div class="meta">' + (d.loaded ? 'Звіт сформовано ' + esc(dt(d.loaded)) : '') +
+      (d.control !== null && d.control !== undefined ? (Math.abs(d.control - t.f) > 2 ? ' · <span class="neg">⚠ не сходиться з «Общий итог» 1С (' + tys(d.control) + ')</span>' : ' · ✓ сходиться з 1С') : '') + '</div>';
     h += '</section>';
-    h += '<div class="sortbar" id="pfsort"><span class="muted">Сортувати:</span>';
-    Object.keys(SORTS).forEach(function (k) { h += '<button class="chip sm" data-s="' + k + '" aria-pressed="' + (PF.sort === k) + '">' + SORTS[k][0] + '</button>'; });
-    h += '</div>';
-    h += '<div class="two"><section class="card" id="pftree">' + treeHtml(d) + '</section>';
+    h += '<div class="two"><section class="card" id="pfgroups">' + pfGroupsHtml(d) + '</section>';
     h += '<section class="card" id="pfclients">' + pfClientsHtml(d) + '</section></div>';
     app.innerHTML = h;
-    bindPFChips(); bindPF();
+    bindPFChips(); bindPF(d); drawPFPie(d);
   }
-  function kpi(l, v, u) { return '<div class="kpi"><div class="l">' + l + '</div><div class="v num">' + v + '</div>' + (u ? '<div class="u">' + u + '</div>' : '') + '</div>'; }
   function bindPFChips() {
     var chips = document.getElementById('pfchips');
     Array.prototype.forEach.call(chips.querySelectorAll('.chip'), function (b) {
-      b.onclick = function () { var m = b.getAttribute('data-m'); if (m !== PF.month) { PF.month = m; PF.open = {}; PF.copen = {}; PF.cfull = {}; render(); } };
+      b.onclick = function () { var m = b.getAttribute('data-m'); if (m !== PF.month) { PF.month = m; PF.gopen = {}; PF.copen = {}; PF.cgopen = {}; render(); } };
     });
     var sel = chips.querySelector('[aria-pressed="true"]');
     if (sel) chips.scrollLeft = Math.max(0, sel.offsetLeft - chips.clientWidth / 2 + sel.clientWidth / 2);
   }
-  function metricLine(o, base) {
-    var r = rent(o), e = execPct(o);
-    return '<span>план ' + tys(o.p) + '</span><span>вик. ' + pctTxt(e) + '</span>' +
-      '<span' + (o.pr < 0 ? ' class="neg"' : '') + '>приб. ' + tys(o.pr) + '</span><span>рент. ' + pctTxt(r) + '</span>' +
-      (base ? '<span>частка ' + pct(o.f, base) + '</span>' : '');
-  }
-  // 1) Рейтинг продуктів за групами (дерево)
-  function treeHtml(d) {
-    var h = '<h2>Рейтинг продуктів за групами</h2><div class="muted small">Натисніть на групу, щоб розгорнути. Суми в тис. грн без ПДВ.</div><div class="tree">';
-    var root = d.tree, base = d.totals.f;
-    var top = root.ch.length ? root.ch : [root];
-    sorted(top).forEach(function (n, i) { h += nodeHtml(n, String(i), 0, base); });
-    return h + '</div>';
-  }
-  function nodeHtml(n, id, depth, base) {
-    var open = !!PF.open[id], hasKids = n.ch.length || n.it.length;
-    var h = '<div class="tn d' + Math.min(depth, 4) + '"><button class="trow' + (open ? ' open' : '') + '" data-id="' + id + '"' + (hasKids ? '' : ' disabled') + '>' +
-      '<div class="r1"><span class="nm"><span class="caret">' + (hasKids ? (open ? '▾' : '▸') : '') + '</span> ' + esc(n.n) + '</span><span class="num fv">' + tys(n.f) + '</span></div>' +
-      '<div class="r2 num">' + metricLine(n, base) + '</div></button>';
-    if (open) {
-      sorted(n.ch).forEach(function (c, i) { h += nodeHtml(c, id + '.' + i, depth + 1, base); });
-      if (n.it.length) h += itemsTable(sorted(n.it), base, false);
-    }
-    return h + '</div>';
-  }
-  function itemsTable(items, base, withGroup) {
+  function itemRows(items) {
     var h = '<div class="its">';
     items.forEach(function (it, i) {
-      h += '<div class="it"><div class="r1"><span class="nm"><span class="rk">' + (i + 1) + '.</span> ' + esc(it.n) +
-        (withGroup && it.g ? '<span class="grp"> · ' + esc(it.g) + '</span>' : '') + '</span><span class="num fv">' + tys(it.f) + '</span></div>' +
-        '<div class="r2 num"><span>к-сть ' + fmtQ.format(it.qf) + ' / план ' + fmtQ.format(it.qp) + '</span>' + metricLine(it, 0) + '</div></div>';
+      h += '<div class="it"><span class="rk">' + (i + 1) + '</span><span class="nm">' + esc(it.n) + '<span class="sub num">' + esc(qtyTxt(it)) + '</span></span>' +
+        '<span class="vals num"><b>' + tys(it.f) + '</b><span class="' + (it.pr < 0 ? 'neg' : '') + '">' + rentTxt(it) + '</span></span></div>';
     });
     return h + '</div>';
   }
-  // 2) Рейтинг клієнтів із випадаючим списком продуктів
+  // 1) Кругова діаграма груп + рейтинг груп із продуктами
+  function pfGroupsHtml(d) {
+    var t = d.totals.f;
+    var h = '<h2>Групи продуктів</h2><div class="pfpie"><canvas id="pfPie" role="img" aria-label="Кругова діаграма продажів за групами"></canvas>' +
+      '<div class="center"><div class="v num">' + tys(t) + '</div><div class="l">тис. грн</div></div></div>';
+    h += '<div class="thead"><span>Група</span><span>тис. грн · рентаб.</span></div>';
+    d.groups.forEach(function (g, i) {
+      var open = !!PF.gopen[g.n];
+      h += '<div class="cl' + (open ? ' open' : '') + '"><button class="row" data-g="' + esc(g.n) + '">' +
+        '<span class="sw" style="background:' + pfColor(d, g.n) + '"></span><span class="nm">' + esc(g.n) + '<span class="sub">' + pct(g.f, t) + ' · ' + g.it.length + ' прод.</span></span>' +
+        '<span class="vals num"><b>' + tys(g.f) + '</b><span class="' + (g.pr < 0 ? 'neg' : '') + '">' + rentTxt(g) + '</span></span><span class="caret">' + (open ? '▾' : '▸') + '</span></button>';
+      if (open) h += itemRows(g.it);
+      h += '</div>';
+    });
+    return h + '<div class="muted small">Рентабельність = маржинальний прибуток / собівартість</div>';
+  }
+  function drawPFPie(d) {
+    if (PF.chart) { PF.chart.destroy(); PF.chart = null; }
+    if (!window.Chart) return;
+    var t = d.totals.f, main = d.groups.filter(function (g, i) { return i < 8 && g.f / t >= 0.05; });
+    var other = t - main.reduce(function (s, g) { return s + g.f; }, 0);
+    var labels = main.map(function (g) { return g.n; }), data = main.map(function (g) { return g.f; }), colors = main.map(function (g) { return pfColor(d, g.n); });
+    if (other > 0.5) { labels.push('Інше'); data.push(other); colors.push(cssVar('--other')); }
+    PF.chart = new Chart(document.getElementById('pfPie'), {
+      type: 'doughnut',
+      data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderColor: cssVar('--surface'), borderWidth: 3, borderRadius: 4, hoverOffset: 6 }] },
+      options: { cutout: '62%', responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return ' ' + c.label + ': ' + tys(c.raw) + ' тис. грн (' + pct(c.raw, t) + ')'; } } } },
+        onClick: function (e, els) {
+          if (!els.length || labels[els[0].index] === 'Інше') return;
+          var n = labels[els[0].index]; PF.gopen[n] = true; document.getElementById('pfgroups').innerHTML = pfGroupsHtml(d); drawPFPie(d);
+          var el = document.querySelector('#pfgroups [data-g="' + CSS.escape(n) + '"]'); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } },
+      plugins: [{ id: 'pfPct', afterDatasetsDraw: function (ch) {
+        var ctx = ch.ctx; ctx.save(); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ch.getDatasetMeta(0).data.forEach(function (a, i) { var s = data[i] / t; if (s < 0.07) return; var p = a.tooltipPosition(); ctx.fillText(Math.round(s * 100) + '%', p.x, p.y); });
+        ctx.restore(); } }]
+    });
+  }
+  // 2) Клієнти: стовпчикова діаграма-рейтинг, розгортання → групи → продукти
   function pfClientsHtml(d) {
     var q = PF.q.trim().toLowerCase();
-    var list = sorted(q ? d.clients.filter(function (c) { return c.n.toLowerCase().indexOf(q) >= 0; }) : d.clients);
-    var limit = PF.showAll || q ? list.length : Math.min(20, list.length);
-    var h = '<h2>Рейтинг клієнтів <span class="muted" style="font-weight:400">· ' + d.clients.length + '</span></h2>';
+    var list = q ? d.clients.filter(function (c) { return c.n.toLowerCase().indexOf(q) >= 0; }) : d.clients;
+    var limit = PF.showAll || q ? list.length : Math.min(15, list.length);
+    var max = d.clients.length ? d.clients[0].f : 1, t = d.totals.f;
+    var h = '<h2>Клієнти <span class="muted" style="font-weight:400">· ' + d.clients.length + '</span></h2>';
     h += '<input class="search" id="pfq" type="search" placeholder="Пошук клієнта" value="' + esc(PF.q) + '" autocomplete="off">';
     for (var i = 0; i < limit; i++) {
       var c = list[i], open = !!PF.copen[c.key];
-      h += '<div class="cl' + (open ? ' open' : '') + '"><button class="trow" data-c="' + esc(c.key) + '">' +
-        '<div class="r1"><span class="nm"><span class="caret">' + (open ? '▾' : '▸') + '</span> <span class="rk">' + (i + 1) + '.</span> ' + esc(c.n) +
-        (c.rg && c.rg !== 'Украина' ? ' <span class="badge">' + esc(c.rg) + '</span>' : '') + '</span><span class="num fv">' + tys(c.f) + '</span></div>' +
-        '<div class="r2 num">' + metricLine(c, d.totals.f) + (c.debt ? '<span' + (c.debt > 0 ? ' class="neg"' : '') + '>борг ' + tys(c.debt) + '</span>' : '') + '</div></button>';
+      h += '<div class="cl' + (open ? ' open' : '') + '"><button class="row bar-row" data-c="' + esc(c.key) + '">' +
+        '<span class="rk">' + (d.clients.indexOf(c) + 1) + '</span><span class="nm">' + esc(c.n) +
+        (c.rg && c.rg !== 'Украина' ? ' <span class="badge">' + esc(c.rg) + '</span>' : '') +
+        '<span class="gbar"><i style="width:' + Math.max(1.5, c.f / max * 100).toFixed(1) + '%"></i></span>' +
+        '<span class="sub">' + pct(c.f, t) + ' · рентаб. ' + rentTxt(c) + (c.debt > 0 ? ' · <span class="neg">борг ' + tys(c.debt) + '</span>' : '') + '</span></span>' +
+        '<span class="vals num"><b>' + tys(c.f) + '</b></span><span class="caret">' + (open ? '▾' : '▸') + '</span></button>';
       if (open) {
-        var its = sorted(c.it), full = !!PF.cfull[c.key];
-        h += itemsTable(full ? its : its.slice(0, 10), 0, true);
-        if (its.length > 10) h += '<button class="lnk" data-cf="' + esc(c.key) + '">' + (full ? 'Лише топ-10' : 'Показати всі продукти (' + its.length + ')') + '</button>';
+        c.g.forEach(function (g) {
+          var gk = c.key + '|' + g.n, go = PF.cgopen[gk] !== false; // групи клієнта розгорнуті за замовчуванням
+          h += '<div class="cg"><button class="row cg-row" data-cg="' + esc(gk) + '"><span class="sw" style="background:' + pfColor(d, g.n) + '"></span>' +
+            '<span class="nm">' + esc(g.n) + '</span><span class="vals num"><b>' + tys(g.f) + '</b><span class="' + (g.pr < 0 ? 'neg' : '') + '">' + rentTxt(g) + '</span></span><span class="caret">' + (go ? '▾' : '▸') + '</span></button>';
+          if (go) h += itemRows(g.it);
+          h += '</div>';
+        });
       }
       h += '</div>';
     }
     if (!list.length) h += '<div class="muted" style="padding:10px 0">Нічого не знайдено</div>';
-    if (!q && !PF.showAll && list.length > 20) h += '<button class="btn full" id="pfall">Показати всіх (' + list.length + ')</button>';
-    return h;
+    if (!q && !PF.showAll && list.length > 15) h += '<button class="btn full" id="pfall">Показати всіх (' + list.length + ')</button>';
+    return h + '<div class="muted small">Суми — тис. грн без ПДВ, від більшого до меншого</div>';
   }
-  function bindPF() {
-    var d = PF.cache[PF.month];
-    Array.prototype.forEach.call(document.querySelectorAll('#pfsort .chip'), function (b) {
-      b.onclick = function () { PF.sort = b.getAttribute('data-s'); render(); };
-    });
-    var tree = document.getElementById('pftree');
-    tree.onclick = function (e) {
-      var b = e.target.closest('.trow'); if (!b || b.disabled) return;
-      var id = b.getAttribute('data-id'); PF.open[id] = !PF.open[id];
-      tree.innerHTML = treeHtml(d);
+  function bindPF(d) {
+    var gbox = document.getElementById('pfgroups');
+    gbox.onclick = function (e) {
+      var b = e.target.closest('[data-g]'); if (!b) return;
+      var n = b.getAttribute('data-g'); PF.gopen[n] = !PF.gopen[n];
+      gbox.innerHTML = pfGroupsHtml(d); drawPFPie(d);
     };
     var box = document.getElementById('pfclients');
-    var rer = function () { box.innerHTML = pfClientsHtml(d); bindPFClients(); };
-    function bindPFClients() {
+    var rer = function () { box.innerHTML = pfClientsHtml(d); bindQ(); };
+    function bindQ() {
       var q = document.getElementById('pfq');
       q.oninput = function () { PF.q = q.value; var pos = q.selectionStart; rer(); var n = document.getElementById('pfq'); n.focus(); n.setSelectionRange(pos, pos); };
       var all = document.getElementById('pfall'); if (all) all.onclick = function () { PF.showAll = true; rer(); };
     }
     box.onclick = function (e) {
-      var cf = e.target.closest('[data-cf]');
-      if (cf) { var k2 = cf.getAttribute('data-cf'); PF.cfull[k2] = !PF.cfull[k2]; rer(); return; }
-      var b = e.target.closest('.trow'); if (!b) return;
+      var cg = e.target.closest('[data-cg]');
+      if (cg) { var gk = cg.getAttribute('data-cg'); PF.cgopen[gk] = PF.cgopen[gk] === false; rer(); return; }
+      var b = e.target.closest('[data-c]'); if (!b) return;
       var k = b.getAttribute('data-c'); PF.copen[k] = !PF.copen[k]; rer();
     };
-    bindPFClients();
+    bindQ();
   }
 })();
 </script>

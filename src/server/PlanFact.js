@@ -155,82 +155,93 @@ function apiPlanFactMonths() {
   return out;
 }
 
-/** Дані вкладки за місяць 'YYYY-MM'. */
+/** Дані вкладки за місяць 'YYYY-MM' (лише ФАКТ). */
 function apiPlanFact(month) {
-  var v = dataVersion_(), key = 'pf|' + v + '|' + month;
+  var v = dataVersion_(), key = 'pf2|' + v + '|' + month;
   var c = cacheGetJson_(key); if (c) return c;
+  var ss = getSpreadsheet_();
   var items = readDataset_('planfact', function (o) { return o.month.slice(0, 7) === month; });
   var clients = readDataset_('planfact_clients', function (o) { return o.month.slice(0, 7) === month; });
-  var view = buildPlanFact_(items, clients);
+  // назви продуктових груп — як на вкладці «Продажі» (аркуш _groups + правило 9.3)
+  var gmap = {};
+  var g = ss.getSheetByName(CONFIG.SHEET_GROUPS);
+  if (g && g.getLastRow() > 1) g.getRange(2, 1, g.getLastRow() - 1, 4).getValues().forEach(function (r) { gmap[String(r[0])] = String(r[3] || ''); });
+  // одиниці виміру — з набору «Продажі» (у звіті план-факт їх немає)
+  var units = {};
+  var sh = ss.getSheetByName(DATASETS.sales.sheet);
+  if (sh && sh.getLastRow() > 1) {
+    var ic = DATASETS.sales.columns.indexOf('item') + 1, uc = DATASETS.sales.columns.indexOf('unit') + 1;
+    var iv = sh.getRange(2, ic, sh.getLastRow() - 1, 1).getValues(), uv = sh.getRange(2, uc, sh.getLastRow() - 1, 1).getValues();
+    iv.forEach(function (r, i) { if (r[0] && uv[i][0]) units[String(r[0]).trim().toLowerCase()] = String(uv[i][0]); });
+  }
+  var view = buildPlanFact_(items, clients, gmap, units);
   view.month = month;
   view.control = null;
-  var ctl = getSpreadsheet_().getSheetByName(CONFIG.SHEET_CONTROL);
-  if (ctl && ctl.getLastRow() > 1) ctl.getRange(2, 1, ctl.getLastRow() - 1, 6).getDisplayValues().forEach(function (r) {
-    if (r[0] === 'planfact' && r[2].slice(0, 7) === month) view.control = parseFloat(String(r[5]).replace(/[\s ]/g, '').replace(',', '.'));
+  var ctl = ss.getSheetByName(CONFIG.SHEET_CONTROL);
+  if (ctl && ctl.getLastRow() > 1) ctl.getRange(2, 1, ctl.getLastRow() - 1, 8).getDisplayValues().forEach(function (r) {
+    if (r[0] === 'planfact' && r[2].slice(0, 7) === month) { view.control = parseFloat(String(r[5]).replace(/[\s\u00a0]/g, '').replace(',', '.')); view.loaded = r[7]; }
   });
+  view.groupOrder = view.groups.map(function (x) { return x.n; });
   cachePutJson_(key, view);
   return view;
 }
 
-/**
- * ЧИСТА функція: рядки товарів і клієнтів → {totals, tree, clients}.
- * Скорочені ключі: n назва, p план, f факт, c собівартість факт, pr прибуток факт, pp прибуток план,
- * qp/qf кількість план/факт, k код, ch діти, it товари.
- */
-function buildPlanFact_(items, clientRows) {
-  function acc(o, r) { o.p += r.sum_plan; o.f += r.sum_fact; o.c += r.cost_fact; o.pr += r.profit_fact; o.pp += r.profit_plan; o.cp += r.cost_plan; }
-  function blank(n) { return { n: n, p: 0, f: 0, c: 0, pr: 0, pp: 0, cp: 0 }; }
-  function fin(o) { ['p', 'f', 'c', 'pr', 'pp', 'cp'].forEach(function (k) { o[k] = Math.round(o[k]); }); return o; } // цілі гривні — менший обсяг для телефона
-  var byF = function (a, b) { return b.f - a.f || b.p - a.p; };
+/** Назва продуктової групи для шляху груп. */
+function pfGroupName_(path, gmap) {
+  if (gmap[path]) return gmap[path];
+  if (!path) return '(без групи)';
+  var res = resolveProductGroup_(path);
+  return GROUP_RULE.DISPLAY_OVERRIDES[res.name] || res.name;
+}
 
-  var totals = blank('Усього');
-  var root = { node: blank(''), ch: {}, it: {} };
-  var cl = {};
+/**
+ * ЧИСТА функція: рядки товарів і клієнтів → {totals, groups, clients}. Лише факт.
+ * Ключі: n назва, f сума факт (грн без ПДВ), pr маржинальний прибуток, c собівартість, q кількість, u одиниця,
+ * it продукти, g групи (у клієнта), debt борг.
+ */
+function buildPlanFact_(items, clientRows, gmap, units) {
+  gmap = gmap || {}; units = units || {};
+  function blank(n) { return { n: n, f: 0, pr: 0, c: 0 }; }
+  function acc(o, r) { o.f += r.sum_fact; o.pr += r.profit_fact; o.c += r.cost_fact; }
+  function fin(o) { o.f = Math.round(o.f); o.pr = Math.round(o.pr); o.c = Math.round(o.c); return o; }
+  var byF = function (a, b) { return b.f - a.f || b.q - a.q; };
+  function addItem(map, r) {
+    var k = r.item_code || r.item;
+    if (!map[k]) { map[k] = blank(r.item); map[k].q = 0; map[k].u = units[String(r.item).trim().toLowerCase()] || ''; }
+    acc(map[k], r); map[k].q += r.qty_fact;
+  }
+  function itemsOut(map) {
+    return Object.keys(map).map(function (k) {
+      var o = fin(map[k]);
+      if (/^тис\.?\s*шт/i.test(o.u)) { o.q = o.q * 1000; o.u = 'шт'; } // показуємо в штуках
+      o.q = Math.round(o.q * 1000) / 1000; return o;
+    })
+      .filter(function (o) { return o.f || o.q; }).sort(byF);
+  }
+  var totals = blank('Усього'), groups = {}, cl = {};
   items.forEach(function (r) {
+    if (!r.sum_fact && !r.qty_fact && !r.profit_fact) return; // лише фактичні продажі
     acc(totals, r);
-    // дерево груп (без напрямку і клієнта), товари агреговані по всіх клієнтах
-    var parts = r.group_path ? r.group_path.split(GROUP_RULE.PATH_SEPARATOR) : ['(без групи)'];
-    var cur = root; acc(cur.node, r);
-    parts.forEach(function (name) {
-      if (!cur.ch[name]) cur.ch[name] = { node: blank(name), ch: {}, it: {} };
-      cur = cur.ch[name]; acc(cur.node, r);
-    });
-    var ik = r.item_code || r.item;
-    if (!cur.it[ik]) { cur.it[ik] = blank(r.item); cur.it[ik].k = r.item_code; cur.it[ik].qp = 0; cur.it[ik].qf = 0; }
-    acc(cur.it[ik], r); cur.it[ik].qp += r.qty_plan; cur.it[ik].qf += r.qty_fact;
-    // клієнти
+    var gn = pfGroupName_(r.group_path, gmap);
+    if (!groups[gn]) { groups[gn] = blank(gn); groups[gn].it = {}; }
+    acc(groups[gn], r); addItem(groups[gn].it, r);
     var ck = r.counterparty_code || r.counterparty;
-    if (!cl[ck]) { cl[ck] = blank(r.counterparty); cl[ck].rg = r.region; cl[ck].it = {}; cl[ck].pay = 0; cl[ck].debt = 0; }
+    if (!cl[ck]) { cl[ck] = blank(r.counterparty); cl[ck].rg = r.region; cl[ck].g = {}; cl[ck].debt = 0; }
     acc(cl[ck], r);
-    var ci = cl[ck].it;
-    if (!ci[ik]) { ci[ik] = blank(r.item); ci[ik].k = r.item_code; ci[ik].g = parts[parts.length - 1]; ci[ik].qp = 0; ci[ik].qf = 0; }
-    acc(ci[ik], r); ci[ik].qp += r.qty_plan; ci[ik].qf += r.qty_fact;
+    var cg = cl[ck].g;
+    if (!cg[gn]) { cg[gn] = blank(gn); cg[gn].it = {}; }
+    acc(cg[gn], r); addItem(cg[gn].it, r);
   });
   (clientRows || []).forEach(function (r) {
     var ck = r.counterparty_code || r.counterparty;
-    if (!cl[ck]) { cl[ck] = blank(r.counterparty); cl[ck].rg = r.region; cl[ck].it = {}; cl[ck].pay = 0; cl[ck].debt = 0; }
-    cl[ck].pay += r.payments; cl[ck].debt += r.debt;
+    if (cl[ck]) cl[ck].debt += r.debt;
   });
-
-  function itemsOut(m) {
-    return Object.keys(m).map(function (k) { var o = fin(m[k]); o.qp = Math.round(o.qp * 1000) / 1000; o.qf = Math.round(o.qf * 1000) / 1000; return o; }).sort(byF);
-  }
-  // дерево: ланцюжки з одного підвузла зливаються в одну назву "A › B"
-  function out(t) {
-    var keys = Object.keys(t.ch), its = Object.keys(t.it);
-    while (keys.length === 1 && !its.length) {
-      var only = t.ch[keys[0]];
-      only.node.n = (t.node.n ? t.node.n + ' › ' : '') + only.node.n;
-      t = only; keys = Object.keys(t.ch); its = Object.keys(t.it);
-    }
-    var o = fin(t.node);
-    o.ch = keys.map(function (k) { return out(t.ch[k]); }).sort(byF);
-    o.it = itemsOut(t.it);
+  var gOut = Object.keys(groups).map(function (k) { var o = fin(groups[k]); o.it = itemsOut(o.it); return o; })
+    .filter(function (o) { return o.f; }).sort(byF);
+  var cOut = Object.keys(cl).map(function (k) {
+    var o = fin(cl[k]); o.key = k; o.debt = Math.round(o.debt);
+    o.g = Object.keys(o.g).map(function (gk) { var x = fin(o.g[gk]); x.it = itemsOut(x.it); return x; }).sort(byF);
     return o;
-  }
-  var tree = out(root);
-  var clients = Object.keys(cl).map(function (k) {
-    var o = fin(cl[k]); o.key = k; o.pay = Math.round(o.pay * 100) / 100; o.debt = Math.round(o.debt * 100) / 100; o.it = itemsOut(o.it); return o;
-  }).sort(byF);
-  return { totals: fin(totals), tree: tree, clients: clients };
+  }).filter(function (o) { return o.f; }).sort(byF);
+  return { totals: fin(totals), groups: gOut, clients: cOut };
 }

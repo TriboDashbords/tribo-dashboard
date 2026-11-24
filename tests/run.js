@@ -167,10 +167,11 @@ console.log('6c. План-факт (вигадані дані)');
   r.payloads.forEach(p => { const x = T.ingestPayload_(p, 'test'); ok(x.ok, 'запис ' + p.dataset + (x.ok ? '' : ': ' + x.error)); });
   ok(JSON.stringify(api('init', [s2.token]).planfactMonths) === '["2026-10"]', 'місяці план-факту в init');
   const v = api('planfact', [s2.token, '2026-10']);
-  ok(v.totals.f === 3300 && v.totals.p === 4300 && v.control === 3300, 'підсумки план/факт і контроль');
-  const c1 = v.clients.find(c => c.n === 'Клієнт 2');
-  ok(c1 && c1.debt === -50 && c1.it[0].pr === 800, 'клієнт: борг і прибуток товару');
-  ok(v.tree.ch.length === 2 && v.tree.ch[0].n === 'Група X › Підгрупа Y' && v.tree.ch[0].f === 3300, 'дерево груп');
+  ok(v.totals.f === 3300 && v.totals.pr === 3300 - 1800 && v.control === 3300, 'підсумки факту, маржа і контроль');
+  ok(v.groups.length === 1 && v.groups[0].f === 3300 && v.groups[0].it[0].f === 2400 && v.groups[0].it[0].q === 3, 'групи: товари без плану відкинуто, ранжування');
+  const c1 = v.clients.find(c => c.n === 'Клієнт 2'), c0 = v.clients.find(c => c.n === 'Клієнт 1');
+  ok(c1 && c1.debt === -50 && c1.g[0].it[0].pr === 800 && c0.debt === 100, 'клієнт: борг, групи і продукти');
+  ok(v.clients[0].f >= v.clients[1].f, 'клієнти від більшого до меншого');
 }
 
 console.log('7. Сторінка');

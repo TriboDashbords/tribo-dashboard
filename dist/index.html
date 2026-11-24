@@ -132,6 +132,7 @@
   var TOKEN_KEY = 'tribo_token', EMAIL_KEY = 'tribo_email', memToken = '';
   function getToken() { try { return localStorage.getItem(TOKEN_KEY) || memToken; } catch (e) { return memToken; } }
   function setToken(t) { memToken = t || ''; try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+  function errText(e) { return String(e && e.message || e).replace(/^(Exception|Error|Помилка):\s*/i, ''); }
   function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function rpc(name, args) {
@@ -196,7 +197,7 @@
         if (!em || !pw) return;
         $('lgo').disabled = true; $('lgo').textContent = 'Перевіряємо…';
         rpc('login', [em, pw]).then(function (r) { lsSet(EMAIL_KEY, em); setToken(r.token); start(); })
-          .catch(function (e) { showLogin('pw', em, e && e.message || String(e)); });
+          .catch(function (e) { showLogin('pw', em, errText(e)); });
       };
       $('lgo').onclick = go0;
       $('lpass').onkeydown = $('lemail').onkeydown = function (e) { if (e.key === 'Enter') go0(); };
@@ -208,7 +209,7 @@
         var em = inp.value.trim(); if (!em) return;
         btn.disabled = true; btn.textContent = 'Надсилаємо…';
         rpc('requestCode', [em]).then(function () { lsSet(EMAIL_KEY, em); showLogin(2, em); })
-          .catch(function (e) { showLogin(1, em, e && e.message || String(e)); });
+          .catch(function (e) { showLogin(1, em, errText(e)); });
       };
       btn.onclick = go; inp.onkeydown = function (e) { if (e.key === 'Enter') go(); }; inp.focus();
       $('lpwway').onclick = function () { showLogin('pw', inp.value.trim()); };
@@ -218,7 +219,7 @@
         var code = c.value.replace(/\D/g, ''); if (code.length < 6) return;
         ok.disabled = true; ok.textContent = 'Перевіряємо…';
         rpc('verifyCode', [email, code]).then(function (r) { setToken(r.token); start(); })
-          .catch(function (e) { showLogin(2, email, e && e.message || String(e)); });
+          .catch(function (e) { showLogin(2, email, errText(e)); });
       };
       ok.onclick = go2; c.oninput = function () { if (c.value.replace(/\D/g, '').length === 6) go2(); };
       c.onkeydown = function (e) { if (e.key === 'Enter') go2(); }; c.focus();

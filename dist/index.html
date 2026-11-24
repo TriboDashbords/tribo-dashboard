@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ТРІБО · Продажі</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f3f2ef; --surface: #fcfcfb; --line: #e4e2dc;
+    --text: #0b0b0b; --text-2: #52514e; --muted: #8a8882;
+    --accent: #2a78d6; --accent-ink: #ffffff;
+    --good: #0f7b3a; --good-bg: #e6f4ea; --warn: #9a5b00; --warn-bg: #fff3d6; --bad: #b42318; --bad-bg: #fde8e6;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948; --other:#a3a29c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #111110; --surface: #1a1a19; --line: #2c2c2a;
+      --text: #f0efec; --text-2: #c3c2b7; --muted: #8e8d86;
+      --accent: #3987e5;
+      --good: #5cc98a; --good-bg: #16301f; --warn: #f0b84d; --warn-bg: #33270f; --bad: #ff8a80; --bad-bg: #3a1714;
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --other:#6b6a65;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top)) 12px calc(28px + env(safe-area-inset-bottom)); }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 4px 4px 10px; }
+  .brand { font-weight: 700; letter-spacing: .02em; }
+  .upd { color: var(--muted); font-size: 12px; text-align: right; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .hero .label { color: var(--text-2); font-size: 13px; }
+  .hero .big { font-size: clamp(30px, 9vw, 44px); font-weight: 700; line-height: 1.1; margin: 4px 0 2px; }
+  .hero .unit { color: var(--text-2); font-size: 13px; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x proximity; padding: 4px 2px 10px;
+    margin: 14px -16px 0; padding-left: 16px; padding-right: 16px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 auto; scroll-snap-align: start; border: 1px solid var(--line); background: transparent; color: var(--text);
+    border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; cursor: pointer; min-height: 38px; }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .sel { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .sel { flex-wrap: wrap; }
+  .sel > div:last-child { white-space: nowrap; margin-left: auto; }
+  .sel .v { font-size: 22px; font-weight: 700; }
+  .status { display: flex; gap: 8px; align-items: flex-start; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-top: 12px; }
+  .status.good { background: var(--good-bg); color: var(--good); }
+  .status.warn { background: var(--warn-bg); color: var(--warn); }
+  .status.bad { background: var(--bad-bg); color: var(--bad); }
+  .status b { font-weight: 700; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .pies { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; margin-bottom: 8px; }
+  .pies.one { grid-template-columns: 1fr; }
+  .piebox { min-width: 0; }
+  .lnk { font: inherit; font-size: 13px; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 6px 0 0; }
+  .piebox .pt { text-align: center; font-size: 13px; font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
+  .chartbox { position: relative; height: 170px; max-width: 240px; margin: 0 auto; }
+  .pies.one .chartbox { height: 230px; max-width: 300px; }
+  .gt td.r { white-space: nowrap; }
+  .pc { color: var(--muted); font-size: 12px; }
+  .cl.open { background: var(--bg); border-radius: 10px; }
+  .cl.open .client { border-top-color: transparent; }
+  .items { padding: 0 8px 10px 22px; font-size: 14px; }
+  .items th { font-size: 11px; }
+  .items td { padding: 7px 4px; }
+  .rk { color: var(--muted); }
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .center .v { font-size: 15px; font-weight: 700; }
+  .center .l { font-size: 11px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 9px 4px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; border-top: 0; }
+  td.r, th.r { text-align: right; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: 0; }
+  tr.click { cursor: pointer; }
+  tr.sub td { color: var(--text-2); font-size: 13px; padding-top: 6px; padding-bottom: 6px; }
+  tr.sub td:first-child { padding-left: 22px; }
+  .caret { color: var(--muted); font-size: 12px; margin-left: 4px; }
+  input.search { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); margin-bottom: 8px; }
+  .client { display: block; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line);
+    padding: 10px 2px; color: inherit; font: inherit; cursor: pointer; }
+  .client .row1 { display: flex; justify-content: space-between; gap: 10px; }
+  .client .name { overflow-wrap: anywhere; }
+  .client .meta { color: var(--muted); font-size: 12px; text-align: right; }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+  .btn { font: inherit; border: 1px solid var(--line); background: transparent; color: var(--accent); border-radius: 10px; padding: 10px 14px; cursor: pointer; min-height: 40px; }
+  .btn.full { width: 100%; margin-top: 10px; }
+  .muted { color: var(--muted); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .btn:disabled { opacity: .6; }
+  .login { max-width: 420px; margin: 24px auto; }
+  .login p { margin: 0 0 12px; }
+  .login .status { margin-top: 12px; }
+  input.code { font-size: 24px; letter-spacing: 8px; text-align: center; }
+  .upd .lnk { font-size: 12px; padding: 0; }
+
+  .item-q { color: var(--muted); font-size: 12px; }
+  .loading { text-align: center; padding: 40px 0; color: var(--muted); }
+  .err { white-space: pre-wrap; }
+  @media (min-width: 720px) { .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .two .card { margin-bottom: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">ТРІБО · Продажі</div>
+    <div class="upd" id="upd">Завантаження…</div>
+  </header>
+  <div id="app"><div class="loading">Завантаження даних…</div></div>
+</div>
+
+<script>
+(function () {
+  var MONTHS = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+  var fmt1 = new Intl.NumberFormat('uk-UA', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  var fmtQ = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 3 });
+  function tys(x) { return fmt1.format((x || 0) / 1000); }
+  function pct(x, t) { return t ? fmt1.format(x / t * 100) + ' %' : '—'; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+  // Виклик сервера: у Google Apps Script — google.script.run.api(name, args); у попередньому перегляді — window.PREVIEW_API
+  var TOKEN_KEY = 'tribo_token', EMAIL_KEY = 'tribo_email', memToken = '';
+  function getToken() { try { return localStorage.getItem(TOKEN_KEY) || memToken; } catch (e) { return memToken; } }
+  function setToken(t) { memToken = t || ''; try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+  function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function rpc(name, args) {
+    return new Promise(function (res, rej) {
+      if (window.google && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(res).withFailureHandler(rej).api(name, args);
+      } else {
+        setTimeout(function () { try { res(window.PREVIEW_API[name].apply(null, args)); } catch (e) { rej(e); } }, 60);
+      }
+    });
+  }
+  var PRIV = { apiInit: 'init', apiPeriod: 'period', apiClientItems: 'clientItems' };
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return rpc(PRIV[fn], [getToken()].concat(args)).catch(function (e) {
+      if (String(e && e.message || e).indexOf('AUTH_REQUIRED') >= 0) { setToken(''); showLogin(); return new Promise(function () {}); }
+      throw e;
+    });
+  }
+
+  var S = { init: null, period: null, cache: {}, data: null, otherOpen: false, showAll: false, q: '', open: {}, full: {}, items: {}, charts: [] };
+  var app = document.getElementById('app');
+
+  function start() {
+    app.innerHTML = '<div class="loading">Завантаження даних…</div>';
+    S.cache = {}; S.items = {}; S.open = {}; S.full = {};
+    call('apiInit').then(function (init) {
+      S.init = init; S.period = init.currentMonth; S.cache[init.currentMonth] = init.period; S.cache[0] = init.yearPeriod; S.data = init.period;
+      renderUpdated(); render();
+    }).catch(showError);
+  }
+
+  // Вхід за кодом із пошти
+  function showLogin(step, email, msg) {
+    document.getElementById('upd').innerHTML = '';
+    email = email || lsGet(EMAIL_KEY);
+    var h = '<section class="card login"><h2>Вхід у дашборд</h2>';
+    if (step !== 2) {
+      h += '<p class="muted">Введіть свою пошту — надішлемо код входу.</p>' +
+        '<input class="search" id="lemail" type="email" inputmode="email" autocomplete="email" placeholder="пошта@приклад.com" value="' + esc(email) + '">' +
+        '<button class="btn primary full" id="lsend">Отримати код</button>';
+    } else {
+      h += '<p class="muted">Код надіслано на <b>' + esc(email) + '</b>, якщо цій адресі дозволено вхід. Перевірте також «Спам».</p>' +
+        '<input class="search code" id="lcode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 цифр">' +
+        '<button class="btn primary full" id="lok">Увійти</button>' +
+        '<button class="lnk" id="lback">← Інша пошта або новий код</button>';
+    }
+    if (msg) h += '<div class="status bad" role="alert"><span aria-hidden="true">⚠</span><div>' + esc(msg) + '</div></div>';
+    h += '</section>';
+    app.innerHTML = h;
+    if (step !== 2) {
+      var inp = document.getElementById('lemail'), btn = document.getElementById('lsend');
+      var go = function () {
+        var em = inp.value.trim(); if (!em) return;
+        btn.disabled = true; btn.textContent = 'Надсилаємо…';
+        rpc('requestCode', [em]).then(function () { lsSet(EMAIL_KEY, em); showLogin(2, em); })
+          .catch(function (e) { showLogin(1, em, e && e.message || String(e)); });
+      };
+      btn.onclick = go; inp.onkeydown = function (e) { if (e.key === 'Enter') go(); }; inp.focus();
+    } else {
+      var c = document.getElementById('lcode'), ok = document.getElementById('lok');
+      var go2 = function () {
+        var code = c.value.replace(/\D/g, ''); if (code.length < 6) return;
+        ok.disabled = true; ok.textContent = 'Перевіряємо…';
+        rpc('verifyCode', [email, code]).then(function (r) { setToken(r.token); start(); })
+          .catch(function (e) { showLogin(2, email, e && e.message || String(e)); });
+      };
+      ok.onclick = go2; c.oninput = function () { if (c.value.replace(/\D/g, '').length === 6) go2(); };
+      c.onkeydown = function (e) { if (e.key === 'Enter') go2(); }; c.focus();
+      document.getElementById('lback').onclick = function () { showLogin(1, email); };
+    }
+  }
+
+  function logout() { var t = getToken(); setToken(''); rpc('logout', [t]).catch(function () {}); showLogin(1); }
+
+  if (getToken()) start(); else showLogin(1);
+
+  function showError(e) {
+    app.innerHTML = '<div class="card status bad err"><span aria-hidden="true">⚠</span><div><b>Помилка.</b> ' + esc(e && e.message || e) + '</div></div>';
+  }
+
+  function renderUpdated() {
+    var el = document.getElementById('upd'), u = S.init.updated;
+    if (!u) { el.innerHTML = '<span class="muted">Даних ще немає</span> · <button class="lnk" id="logout">Вийти</button>'; document.getElementById('logout').onclick = logout; return; }
+    var d = new Date(u);
+    var txt = 'Оновлено ' + ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' +
+      ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var hours = (Date.now() - d.getTime()) / 36e5;
+    el.innerHTML = esc(txt) + ' · <button class="lnk" id="logout">Вийти</button>' +
+      (hours > S.init.staleHours ? '<br><span style="color:var(--warn)">⚠ дані старші за ' + S.init.staleHours + ' год</span>' : '');
+    document.getElementById('logout').onclick = logout;
+  }
+
+  function selectPeriod(p) {
+    S.period = p; S.otherOpen = false; S.showAll = false; S.open = {}; S.full = {};
+    if (S.cache[p]) { S.data = S.cache[p]; render(); return; }
+    S.data = null; render();
+    call('apiPeriod', S.init.year, p).then(function (d) { S.cache[p] = d; if (S.period === p) { S.data = d; render(); } }).catch(showError);
+  }
+
+  function periodName(p) { return p ? MONTHS[p - 1] : 'Весь рік'; }
+
+  function render() {
+    var I = S.init, d = S.data;
+    var h = '';
+    // 9.1 Верх
+    h += '<section class="card hero">';
+    h += '<div class="label">Продажі всього, з 01.01.' + I.year + '</div>';
+    h += '<div class="big num">' + tys(I.ytd) + '</div><div class="unit">тис. грн без ПДВ</div>';
+    h += '<div class="chips" id="chips" role="group" aria-label="Період">';
+    for (var m = 1; m <= I.currentMonth; m++) h += '<button class="chip" data-p="' + m + '" aria-pressed="' + (S.period === m) + '">' + MONTHS[m - 1] + '</button>';
+    h += '<button class="chip" data-p="0" aria-pressed="' + (S.period === 0) + '">Весь рік</button></div>';
+    h += '<div class="sel"><div class="muted">' + (S.period ? MONTHS[S.period - 1] : 'Весь рік') + '</div>';
+    h += '<div><span class="v num">' + (d ? tys(d.total) : '…') + '</span> <span class="muted">тис. грн</span></div></div>';
+    if (d) h += controlHtml(d);
+    h += '</section>';
+
+    if (!d) { app.innerHTML = h + '<div class="loading">Завантаження…</div>'; bindChips(); return; }
+    if (!d.rows) { app.innerHTML = h + '<div class="card muted">За ' + esc(periodName(S.period).toLowerCase()) + ' продажів немає.</div>'; bindChips(); return; }
+
+    h += '<div class="two">';
+    var dy = S.cache[0] || d, dm = S.period ? d : null;
+    h += '<section class="card">' + groupsHtml(dm, dy) + '</section>';
+    h += '<section class="card" id="clients">' + clientsHtml(d) + '</section>';
+    h += '</div>';
+    app.innerHTML = h;
+    bindChips(); bindGroups(); bindClients(); drawCharts(dm, dy);
+  }
+
+  function bindChips() {
+    var chips = document.getElementById('chips');
+    Array.prototype.forEach.call(chips.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { var p = +b.getAttribute('data-p'); if (p !== S.period) selectPeriod(p); };
+    });
+    var sel = chips.querySelector('[aria-pressed="true"]');
+    if (sel) chips.scrollLeft = Math.max(0, sel.offsetLeft - chips.clientWidth / 2 + sel.clientWidth / 2);
+  }
+
+  // 9.5 Контроль
+  function controlHtml(d) {
+    var tol = 1; // грн
+    var bad = [];
+    if (Math.abs(d.groupsSum - d.total) > tol) bad.push('сума груп ' + tys(d.groupsSum));
+    if (Math.abs(d.clientsSum - d.total) > tol) bad.push('сума клієнтів ' + tys(d.clientsSum));
+    if (d.control !== null && d.control !== undefined && Math.abs(d.control - d.total) > tol) bad.push('"Итог" 1С ' + tys(d.control));
+    if (bad.length) return '<div class="status bad" role="alert"><span aria-hidden="true">⚠</span><div><b>Розбіжність контролю:</b> період ' +
+      tys(d.total) + ', ' + bad.join(', ') + ' тис. грн</div></div>';
+    if (d.control === null || d.control === undefined) return '<div class="status warn"><span aria-hidden="true">ⓘ</span><div>Групи й клієнти сходяться; контрольної суми 1С за цей період немає.</div></div>';
+    return '<div class="status good"><span aria-hidden="true">✓</span><div>Контроль: групи = клієнти = "Итог" 1С</div></div>';
+  }
+
+  // 9.2 Групи: дві кругові діаграми — обраний місяць і рік
+  function colorFor(name) {
+    var i = S.init.groupOrder.indexOf(name);
+    return i >= 0 && i < 8 ? cssVar('--s' + (i + 1)) : cssVar('--other');
+  }
+  function amountMap(d) { var m = {}; (d && d.groups || []).forEach(function (g) { m[g.name] = g.amount; }); return m; }
+  // Окремі сектори: групи з часткою ≥ 5% у місяці АБО в році (з перших 8 за роком — кольори сталі)
+  function mainGroups(dm, dy) {
+    var th = S.init.otherThreshold, mm = amountMap(dm), my = amountMap(dy);
+    return S.init.groupOrder.slice(0, 8).filter(function (n) {
+      return (dm && dm.total && (mm[n] || 0) / dm.total >= th) || (dy && dy.total && (my[n] || 0) / dy.total >= th);
+    });
+  }
+  function slices(d, main) {
+    var m = amountMap(d), out = [], other = d.total;
+    main.forEach(function (n) { var a = m[n] || 0; if (a > 0) { out.push({ name: n, amount: a, color: colorFor(n) }); other -= a; } });
+    if (other > 0.5) out.push({ name: 'Інше', amount: other, color: cssVar('--other') });
+    return out;
+  }
+  function groupsHtml(dm, dy) {
+    var main = mainGroups(dm, dy), mm = amountMap(dm), my = amountMap(dy), both = !!dm;
+    var h = '<h2>Продажі за продуктовими групами</h2>';
+    h += '<div class="pies' + (both ? '' : ' one') + '">';
+    if (both) h += pieBox('pieM', MONTHS[S.period - 1], dm.total);
+    h += pieBox('pieY', 'Рік ' + S.init.year, dy.total);
+    h += '</div>';
+    h += '<table class="gt"><thead><tr><th>Група</th>' + (both ? '<th class="r">' + esc(MONTHS[S.period - 1]) + '</th>' : '') + '<th class="r">Рік</th></tr></thead><tbody>';
+    function cell(a, t) { return '<td class="r"><span class="num">' + tys(a) + '</span><div class="pc num">' + pct(a, t) + '</div></td>'; }
+    main.forEach(function (n) {
+      h += '<tr><td><span class="sw" style="background:' + colorFor(n) + '"></span>' + esc(n) + '</td>' +
+        (both ? cell(mm[n] || 0, dm.total) : '') + cell(my[n] || 0, dy.total) + '</tr>';
+    });
+    var rest = dy.groups.filter(function (g) { return main.indexOf(g.name) < 0; });
+    if (both) dm.groups.forEach(function (g) { if (main.indexOf(g.name) < 0 && !my[g.name]) rest.push({ name: g.name, amount: 0 }); });
+    if (rest.length) {
+      var oy = dy.total - main.reduce(function (s, n) { return s + (my[n] || 0); }, 0);
+      var om = both ? dm.total - main.reduce(function (s, n) { return s + (mm[n] || 0); }, 0) : 0;
+      h += '<tr class="click" id="otherRow"><td><span class="sw" style="background:' + cssVar('--other') + '"></span>Інше <span class="muted">(' + rest.length + ')</span><span class="caret">' + (S.otherOpen ? '▲' : '▼') + '</span></td>' +
+        (both ? cell(om, dm.total) : '') + cell(oy, dy.total) + '</tr>';
+      if (S.otherOpen) {
+        if (both) rest.sort(function (a, b) { return (mm[b.name] || 0) - (mm[a.name] || 0) || (my[b.name] || 0) - (my[a.name] || 0); });
+        rest.forEach(function (g) {
+          h += '<tr class="sub"><td>' + esc(g.name) + '</td>' + (both ? cell(mm[g.name] || 0, dm.total) : '') + cell(my[g.name] || 0, dy.total) + '</tr>';
+        });
+      }
+    }
+    h += '</tbody></table><div class="muted" style="font-size:12px;margin-top:8px">тис. грн без ПДВ і частка від продажів періоду</div>';
+    return h;
+  }
+  function pieBox(id, title, total) {
+    return '<div class="piebox"><div class="pt">' + esc(title) + '</div><div class="chartbox"><canvas id="' + id + '" role="img" aria-label="Кругова діаграма: ' + esc(title) + '"></canvas>' +
+      '<div class="center"><div class="v num">' + tys(total) + '</div><div class="l">тис. грн</div></div></div></div>';
+  }
+  function bindGroups() {
+    var r = document.getElementById('otherRow');
+    if (r) r.onclick = function () { S.otherOpen = !S.otherOpen; render(); };
+  }
+  function drawCharts(dm, dy) {
+    S.charts.forEach(function (c) { c.destroy(); }); S.charts = [];
+    if (!window.Chart) return;
+    var main = mainGroups(dm, dy);
+    if (dm) S.charts.push(drawPie('pieM', dm, main));
+    S.charts.push(drawPie('pieY', dy, main));
+  }
+  function drawPie(id, d, main) {
+    var sl = slices(d, main);
+    var pctLabels = {
+      id: 'pctLabels',
+      afterDatasetsDraw: function (chart) {
+        var ctx = chart.ctx, meta = chart.getDatasetMeta(0);
+        ctx.save(); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        meta.data.forEach(function (arc, i) {
+          var share = sl[i].amount / d.total; if (share < 0.08) return;
+          var p = arc.tooltipPosition(); ctx.fillText(Math.round(share * 100) + '%', p.x, p.y);
+        });
+        ctx.restore();
+      }
+    };
+    return new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: { labels: sl.map(function (s) { return s.name; }), datasets: [{ data: sl.map(function (s) { return s.amount; }), backgroundColor: sl.map(function (s) { return s.color; }), borderColor: cssVar('--surface'), borderWidth: 2, hoverOffset: 4 }] },
+      options: {
+        cutout: '55%', responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: function (c) { return ' ' + c.label + ': ' + tys(c.raw) + ' тис. грн (' + pct(c.raw, d.total) + ')'; } } } },
+        onClick: function (evt, els) {
+          if (els.length && sl[els[0].index].name === 'Інше') { S.otherOpen = true; render(); var r = document.getElementById('otherRow'); if (r) r.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+        }
+      },
+      plugins: [pctLabels]
+    });
+  }
+
+  // 9.4 Клієнти: розгортання з топ-5 продуктами
+  function itemsKey(k) { return S.period + '|' + k; }
+  function clientsHtml(d) {
+    var q = S.q.trim().toLowerCase();
+    var list = q ? d.clients.filter(function (c) { return c.name.toLowerCase().indexOf(q) >= 0; }) : d.clients;
+    var limit = S.showAll || q ? list.length : Math.min(20, list.length);
+    var max = d.clients.length ? d.clients[0].amount : 1;
+    var h = '<h2>Клієнти <span class="muted" style="font-weight:400">· ' + d.clients.length + '</span></h2>';
+    h += '<input class="search" id="q" type="search" placeholder="Пошук клієнта" value="' + esc(S.q) + '" autocomplete="off">';
+    h += '<div id="clist">';
+    for (var i = 0; i < limit; i++) {
+      var c = list[i], open = !!S.open[c.key];
+      h += '<div class="cl' + (open ? ' open' : '') + '"><button class="client" data-k="' + esc(c.key) + '" aria-expanded="' + open + '"><div class="row1"><span class="name"><span class="caret">' + (open ? '▾' : '▸') + '</span> ' + esc(c.name) + '</span>' +
+        '<span class="meta"><span class="num" style="color:var(--text);font-size:15px">' + tys(c.amount) + '</span><br><span class="num">' + pct(c.amount, d.total) + '</span></span></div>' +
+        '<div class="bar"><i style="width:' + Math.max(1, c.amount / max * 100).toFixed(1) + '%"></i></div></button>';
+      if (open) h += itemsHtml(c);
+      h += '</div>';
+    }
+    if (!list.length) h += '<div class="muted" style="padding:10px 0">Нічого не знайдено</div>';
+    h += '</div>';
+    if (!q && !S.showAll && list.length > 20) h += '<button class="btn full" id="all">Показати всіх (' + list.length + ')</button>';
+    h += '<div class="muted" style="font-size:12px;margin-top:8px">Натисніть на клієнта — його топ-5 продуктів. Суми в тис. грн без ПДВ.</div>';
+    return h;
+  }
+  function itemsHtml(c) {
+    var items = S.items[itemsKey(c.key)];
+    if (!items) return '<div class="items muted">Завантаження…</div>';
+    var full = !!S.full[c.key], show = full ? items : items.slice(0, 5);
+    var h = '<div class="items"><table><thead><tr><th>' + (full ? 'Усі продукти' : 'Топ-5 продуктів') + '</th><th class="r">тис. грн</th><th class="r">Частка</th></tr></thead><tbody>';
+    show.forEach(function (it, i) {
+      h += '<tr><td><span class="rk">' + (i + 1) + '.</span> ' + esc(it.item) + '<div class="item-q num">' + fmtQ.format(it.qty) + ' ' + esc(it.unit) + '</div></td>' +
+        '<td class="r num">' + tys(it.amount) + '</td><td class="r num">' + pct(it.amount, c.amount) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    if (items.length > 5) h += '<button class="lnk" data-full="' + esc(c.key) + '">' + (full ? 'Лише топ-5' : 'Показати всі продукти (' + items.length + ')') + '</button>';
+    return h + '</div>';
+  }
+  function rerenderClients() {
+    var box = document.getElementById('clients'); if (!box) return;
+    box.innerHTML = clientsHtml(S.data); bindClients();
+  }
+  function bindClients() {
+    var box = document.getElementById('clients');
+    var q = document.getElementById('q');
+    if (q) q.oninput = function () {
+      S.q = q.value;
+      var pos = q.selectionStart;
+      rerenderClients();
+      var nq = document.getElementById('q'); nq.focus(); nq.setSelectionRange(pos, pos);
+    };
+    var all = document.getElementById('all');
+    if (all) all.onclick = function () { S.showAll = true; rerenderClients(); };
+    Array.prototype.forEach.call(box.querySelectorAll('[data-full]'), function (b) {
+      b.onclick = function () { var k = b.getAttribute('data-full'); S.full[k] = !S.full[k]; rerenderClients(); };
+    });
+    Array.prototype.forEach.call(box.querySelectorAll('.client'), function (b) {
+      b.onclick = function () {
+        var k = b.getAttribute('data-k');
+        S.open[k] = !S.open[k];
+        rerenderClients();
+        var ik = itemsKey(k), per = S.period;
+        if (S.open[k] && !S.items[ik]) {
+          call('apiClientItems', S.init.year, per, k).then(function (items) {
+            S.items[ik] = items;
+            if (S.period === per) rerenderClients();
+          }).catch(showError);
+        }
+      };
+    });
+  }
+})();
+</script>
+</body>
+</html>

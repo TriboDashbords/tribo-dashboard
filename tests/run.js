@@ -9,7 +9,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
 function fmtCell(v) { return v === null || v === undefined ? '' : String(v); }
 class Range {
   constructor(sh, r, c, nr, nc) { Object.assign(this, { sh, r, c, nr: nr || 1, nc: nc || 1 }); }
-  _chk() { if (this.r + this.nr - 1 > this.sh.maxRows) throw new Error('out of bounds rows'); }
+  _chk() { if (this.r + this.nr - 1 > this.sh.maxRows) throw new Error('out of bounds rows'); if (this.c + this.nc - 1 > this.sh.maxCols) throw new Error('out of bounds cols'); }
   getValues() { const o = []; for (let i = 0; i < this.nr; i++) { const row = []; for (let j = 0; j < this.nc; j++) { const v = (this.sh.data[this.r - 1 + i] || [])[this.c - 1 + j]; row.push(v === undefined ? '' : v); } o.push(row); } return o; }
   getDisplayValues() { return this.getValues().map(r => r.map(fmtCell)); }
   getValue() { return this.getValues()[0][0]; }
@@ -27,6 +27,7 @@ class Sheet {
   getMaxRows() { return this.maxRows; } getMaxColumns() { return this.maxCols; }
   setFrozenRows(n) { this.frozen = n; } getFrozenRows() { return this.frozen; }
   deleteColumns(c, n) { this.maxCols -= n; }
+  insertColumnsAfter(c, n) { this.maxCols += n; }
   deleteRows(r, n) { if (this.maxRows - n <= this.frozen) throw new Error('Не можна видалити всі незакріплені рядки.'); this.data.splice(r - 1, n); this.maxRows -= n; }
   deleteRow(r) { this.deleteRows(r, 1); }
   insertRowsAfter(r, n) { this.maxRows += n; }
@@ -135,6 +136,16 @@ console.log('6. Вихід і блокування');
 api('logout', [sess.token]);
 let e4 = null; try { api('init', [sess.token]); } catch (e) { e4 = e.message; }
 ok(e4 === 'AUTH_REQUIRED', 'після виходу токен недійсний');
+
+console.log('6b. Старий аркуш _users з 4 стовпцями');
+SS.sheets = SS.sheets.filter(s => s.name !== '_users');
+const old = T.getOrCreateSheet_(SS, '_users', ['email', 'name', 'active', 'added']);
+ok(old.getMaxColumns() === 4, 'імітація: 4 стовпці');
+T.TRIBO_API.doGet({ parameter: {} });
+ok(old.getMaxColumns() >= 5 && old.getRange(1, 5).getValue() === 'password', 'стовпець password додано автоматично');
+ok(old.getRange(2, 1).getValue() === 'owner@example.com', 'власника додано автоматично');
+old.getRange(2, 5).setValue('TestPass1');
+ok(!!api('login', ['owner@example.com', 'TestPass1']).token, 'вхід із паролем після виправлення');
 
 console.log('7. Сторінка');
 const page = T.TRIBO_API.doGet({ parameter: {} });

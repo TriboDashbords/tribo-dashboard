@@ -9,6 +9,7 @@
 
 function doGet(e) {
   if (e && e.parameter && e.parameter.health) return json_({ ok: true, service: 'tribo', time: nowIso_() });
+  try { ensureUsersSheet_(); } catch (err) { console.error('ensureUsersSheet_: ' + err); }
   return HtmlService.createHtmlOutput(triboLoad('dist/index.html'))
     .setTitle('ТРІБО · Продажі')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');

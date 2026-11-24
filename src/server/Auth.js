@@ -25,13 +25,42 @@ function sha_(s) {
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)).replace(/=+$/, '');
 }
 
+/**
+ * Гарантує, що аркуш _users має 5 стовпців (email | name | active | added | password)
+ * і що власник у ньому є. Викликається при відкритті сторінки.
+ */
+function ensureUsersSheet_() {
+  var ss = getSpreadsheet_();
+  var sh = getOrCreateSheet_(ss, AUTH.USERS_SHEET, ['email', 'name', 'active', 'added', 'password']);
+  if (sh.getMaxColumns() < 5) sh.insertColumnsAfter(sh.getMaxColumns(), 5 - sh.getMaxColumns());
+  var head = sh.getRange(1, 1, 1, 5).getValues()[0];
+  var want = ['email', 'name', 'active', 'added', 'password'];
+  if (want.some(function (h, i) { return String(head[i]) !== h; })) {
+    sh.getRange(1, 1, 1, 5).setValues([want]).setFontWeight('bold');
+  }
+  if (sh.getLastRow() < 2) {
+    var owner = '';
+    try { owner = Session.getEffectiveUser().getEmail(); } catch (e) {}
+    if (owner) {
+      if (sh.getMaxRows() < 2) sh.insertRowsAfter(sh.getMaxRows(), 1);
+      sh.getRange(2, 1, 1, 4).setValues([[owner, 'Власник', 'так', nowIso_()]]);
+    }
+  }
+  return sh;
+}
+
 /** {email: {name, password}} для активних користувачів. */
 function usersTable_() {
   var sh = getSpreadsheet_().getSheetByName(AUTH.USERS_SHEET), out = {};
   if (!sh || sh.getLastRow() < 2) return out;
-  if (String(sh.getRange(1, 5).getValue()) === '') sh.getRange(1, 5).setValue('password');
-  sh.getRange(2, 1, sh.getLastRow() - 1, 5).getDisplayValues().forEach(function (r) {
-    var e = normEmail_(r[0]), active = String(r[2]).trim().toLowerCase();
+  if (sh.getMaxColumns() < 5) return usersFrom_(sh.getRange(2, 1, sh.getLastRow() - 1, sh.getMaxColumns()).getDisplayValues());
+  return usersFrom_(sh.getRange(2, 1, sh.getLastRow() - 1, 5).getDisplayValues());
+}
+
+function usersFrom_(rows) {
+  var out = {};
+  rows.forEach(function (r) {
+    var e = normEmail_(r[0]), active = String(r[2] || '').trim().toLowerCase();
     if (e && active !== 'ні' && active !== 'no' && active !== 'нет') out[e] = { name: String(r[1] || ''), password: String(r[4] || '') };
   });
   return out;

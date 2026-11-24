@@ -26,7 +26,9 @@ var PUBLIC_API = {
 var PRIVATE_API = {
   init: function () { return apiInit(); },
   period: function (year, period) { return apiPeriod(year, period); },
-  clientItems: function (year, period, clientKey) { return apiClientItems(year, period, clientKey); }
+  clientItems: function (year, period, clientKey) { return apiClientItems(year, period, clientKey); },
+  planfactMonths: function () { return apiPlanFactMonths(); },
+  planfact: function (month) { return apiPlanFact(month); }
 };
 
 function api(name, args) {

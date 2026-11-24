@@ -67,9 +67,14 @@ function importSalesXlsxBlob_(blob, fileName) {
     return key ? files[key].getDataAsString('UTF-8') : null;
   }, Object.keys(files));
 
-  var parsed = parse1cSalesTable_(table, { organization: CONFIG.DEFAULT_ORGANIZATION, fallbackYear: new Date().getFullYear() });
+  // тип звіту: «План-факт» (є стовпці план/факт) або «Продажи»
+  var isPF = isPlanFactTable_(table);
+  var dsName = isPF ? 'planfact' : 'sales';
+  var parsed = isPF
+    ? parsePlanFactTable_(table, { organization: CONFIG.DEFAULT_ORGANIZATION })
+    : parse1cSalesTable_(table, { organization: CONFIG.DEFAULT_ORGANIZATION, fallbackYear: new Date().getFullYear() });
   if (parsed.errors.length) {
-    log_(ss, { source: 'excel', dataset: 'sales', status: 'ERROR', message: fileName + ': ' + parsed.errors.join('; ') });
+    log_(ss, { source: 'excel', dataset: dsName, status: 'ERROR', message: fileName + ': ' + parsed.errors.join('; ') });
     return { ok: false };
   }
   var allOk = true;
@@ -79,7 +84,7 @@ function importSalesXlsxBlob_(blob, fileName) {
     if (!r.ok) allOk = false;
   });
   if (parsed.warnings.length) {
-    log_(ss, { source: 'excel', dataset: 'sales', status: 'WARN', message: fileName + ': ' + parsed.warnings.join('; ') });
+    log_(ss, { source: 'excel', dataset: dsName, status: 'WARN', message: fileName + ': ' + parsed.warnings.join('; ') });
   }
   return { ok: allOk };
 }

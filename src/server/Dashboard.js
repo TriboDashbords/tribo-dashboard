@@ -31,7 +31,8 @@ function apiInit() {
     updated: y.summary.updated, staleHours: DCONFIG.STALE_HOURS,
     groupOrder: y.summary.groupOrder, otherThreshold: DCONFIG.OTHER_THRESHOLD,
     period: getPeriodCached_(year, month, y),
-    yearPeriod: getPeriodCached_(year, 0, y)
+    yearPeriod: getPeriodCached_(year, 0, y),
+    planfactMonths: apiPlanFactMonths()
   };
 }
 
@@ -71,7 +72,8 @@ function dataVersion_() {
   var upd = '';
   var ds = ss.getSheetByName(DCONFIG.DATASETS_SHEET);
   if (ds && ds.getLastRow() > 1) {
-    ds.getRange(2, 1, ds.getLastRow() - 1, 5).getDisplayValues().forEach(function (r) { if (r[0] === 'sales') upd = r[4]; });
+    // версія = час оновлення всіх наборів (кеш скидається, щойно оновився будь-який)
+    upd = ds.getRange(2, 1, ds.getLastRow() - 1, 5).getDisplayValues().map(function (r) { return r[0] + '=' + r[4]; }).join(';');
   }
   var g = ss.getSheetByName(DCONFIG.GROUPS_SHEET), gh = '';
   if (g && g.getLastRow() > 1) {
@@ -129,7 +131,7 @@ function buildAndCache_(year, version) {
   if (c && c.getLastRow() > 1) c.getRange(2, 1, c.getLastRow() - 1, 6).getDisplayValues().forEach(function (r) {
     if (r[0] === 'sales') controls.push({ period_from: r[2], period_to: r[3], amount: r[5] === '' ? null : parseFloat(String(r[5]).replace(/[\s ]/g, '').replace(',', '.')) });
   });
-  var updated = (version || '').split('#')[0];
+  var um = /(?:^|;)sales=([^;#]*)/.exec(version || ''), updated = um ? um[1] : '';
 
   var agg = aggregateYear_(rows, groupsMap, controls, year, updated);
   Object.keys(agg.periods).forEach(function (k) {

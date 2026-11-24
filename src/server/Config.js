@@ -58,6 +58,30 @@ var DATASETS = {
     orgField: 'organization',
     amountField: 'amount',
     hasProductGroups: true // при записі нові group_path додаються в _groups
+  },
+  planfact: {
+    sheet: 'planfact',
+    description: 'План-факт продажів по клієнтах і номенклатурі (звіт 1С, сценарій "Основний щомісячний"), грн без ПДВ',
+    columns: ['month', 'organization', 'region', 'counterparty_code', 'counterparty', 'group_path', 'group_ids',
+              'item_code', 'item', 'qty_plan', 'qty_fact', 'sum_plan', 'sum_fact', 'sum_fact_vat',
+              'cost_plan', 'cost_fact', 'profit_plan', 'profit_fact'],
+    types: {
+      month: 'month', organization: 'text', region: 'text', counterparty_code: 'text', counterparty: 'text',
+      group_path: 'text', group_ids: 'text', item_code: 'text', item: 'text',
+      qty_plan: 'number', qty_fact: 'number', sum_plan: 'number', sum_fact: 'number', sum_fact_vat: 'number',
+      cost_plan: 'number', cost_fact: 'number', profit_plan: 'number', profit_fact: 'number'
+    },
+    required: ['month', 'organization', 'counterparty', 'item'],
+    periodField: 'month', orgField: 'organization', amountField: 'sum_fact'
+  },
+  planfact_clients: {
+    sheet: 'planfact_clients',
+    description: 'Оплати і борг по клієнтах (той самий звіт план-факт, рівень клієнта), грн',
+    columns: ['month', 'organization', 'region', 'counterparty_code', 'counterparty', 'payments', 'debt'],
+    types: { month: 'month', organization: 'text', region: 'text', counterparty_code: 'text', counterparty: 'text',
+             payments: 'number', debt: 'number' },
+    required: ['month', 'organization', 'counterparty'],
+    periodField: 'month', orgField: 'organization', amountField: 'payments'
   }
   // Приклад майбутнього набору:
   // plan: { sheet: 'plan', description: 'План продажів', columns: [...], types: {...},

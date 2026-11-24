@@ -66,7 +66,7 @@ const G = {
 const triboLoad = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const src = triboLoad('dist/server.js');
 const names = Object.keys(G);
-const T = new Function(...names, 'triboLoad', src + '\n;return {TRIBO_API, generateTestPayloads_, ingestPayload_, validatePayload_, readXlsxTable_, parse1cSalesTable_, findKeyCaseInsensitive_, syncGroups_, getOrCreateSheet_, safeDeleteRows_};')(...names.map(n => G[n]), triboLoad);
+const T = new Function(...names, 'triboLoad', src + '\n;return {TRIBO_API, generateTestPayloads_, ingestPayload_, validatePayload_, readXlsxTable_, parse1cSalesTable_, findKeyCaseInsensitive_, syncGroups_, getOrCreateSheet_, safeDeleteRows_, parsePlanFactTable_};')(...names.map(n => G[n]), triboLoad);
 
 console.log('1. Завантаження коду');
 ['doGet', 'doPost', 'api', 'processInbox', 'setup', 'onOpen', 'showToken', 'run'].forEach(f => ok(typeof T.TRIBO_API[f] === 'function', 'TRIBO_API.' + f));
@@ -146,6 +146,32 @@ ok(old.getMaxColumns() >= 5 && old.getRange(1, 5).getValue() === 'password', 'с
 ok(old.getRange(2, 1).getValue() === 'owner@example.com', 'власника додано автоматично');
 old.getRange(2, 5).setValue('TestPass1');
 ok(!!api('login', ['owner@example.com', 'TestPass1']).token, 'вхід із паролем після виправлення');
+
+console.log('6c. План-факт (вигадані дані)');
+{
+  const H = [null, 'Валюта', null, null, null, 'Количество (план)', 'Количество (факт)', 'Сумма (план продажи)', 'Сумма (факт продажи)', 'Сумма (факт продаж с НДС)', 'Сумма (приход проплат)', 'Сумма (долг)', 'Цена себестоимости (маржинальная)', 'Сумма себестоимости (план)', 'Сумма себестоимости (факт)', 'Прибыль (план)', 'Прибыль (факт)', 'Рентабельность (план)', 'Рентабельность (факт)'];
+  const row = (level, cells) => ({ level, cells });
+  const it = (lvl, code, name, qp, qf, sp, sf, cp, cf) => row(lvl, [null, code, name, null, null, qp, qf, sp, sf, sf * 1.2, null, null, null, cp, cf, sp - cp, sf - cf]);
+  const tbl = [
+    row(0, [null, 'Параметры :', 'Период с:', '01.10.2026']), row(0, [null, null, 'по:', '31.10.2026']),
+    row(0, [null, null, 'Организация :', 'ORG']), row(0, H), row(0, [null, 'Клонтрагент']), row(0, [null, 'Код', 'Номенклатура']),
+    row(0, [null, 'Регіон А']), row(1, [null, 'Клієнт 1,', null, null, null, 0, 0, 0, 0, 0, 500, 100]),
+    row(2, [null, 'Група X']), row(3, [null, 'Підгрупа Y']), it(4, 101, 'Товар 1', 1, 1, 1000, 800, 500, 400), it(4, 102, 'Товар 2', 2, 1, 2000, 900, 1000, 600),
+    row(2, [null, 'Група Z']), it(3, 103, 'Товар 3', 1, 0, 300, 0, 100, 0),
+    row(1, [null, 'Клієнт 2', null, null, null, 0, 0, 0, 0, 0, 0, -50]), row(2, [null, 'Група X']), row(3, [null, 'Підгрупа Y']), it(4, 101, 'Товар 1', 1, 2, 1000, 1600, 500, 800),
+    row(0, [null, 'Общий итог', null, null, null, 0, 0, 4300, 3300])
+  ];
+  const r = T.parsePlanFactTable_(tbl, { organization: 'ORG' });
+  ok(r.errors.length === 0 && r.payloads[0].rows.length === 4 && r.payloads[1].rows.length === 2, 'план-факт розібрано: 4 товари, 2 клієнти');
+  ok(r.payloads[1].rows[0].counterparty === 'Клієнт 1', 'кома в кінці назви клієнта прибрана');
+  r.payloads.forEach(p => { const x = T.ingestPayload_(p, 'test'); ok(x.ok, 'запис ' + p.dataset + (x.ok ? '' : ': ' + x.error)); });
+  ok(JSON.stringify(api('init', [s2.token]).planfactMonths) === '["2026-10"]', 'місяці план-факту в init');
+  const v = api('planfact', [s2.token, '2026-10']);
+  ok(v.totals.f === 3300 && v.totals.p === 4300 && v.control === 3300, 'підсумки план/факт і контроль');
+  const c1 = v.clients.find(c => c.n === 'Клієнт 2');
+  ok(c1 && c1.debt === -50 && c1.it[0].pr === 800, 'клієнт: борг і прибуток товару');
+  ok(v.tree.ch.length === 2 && v.tree.ch[0].n === 'Група X › Підгрупа Y' && v.tree.ch[0].f === 3300, 'дерево груп');
+}
 
 console.log('7. Сторінка');
 const page = T.TRIBO_API.doGet({ parameter: {} });

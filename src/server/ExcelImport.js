@@ -54,6 +54,9 @@ function processInbox() {
       f.moveTo(bad);
     }
   }
+
+  // звіти, що 1С надсилає поштою (Розсилки звітів)
+  try { processGmail_(started); } catch (err) { log_(ss, { source: 'gmail', status: 'ERROR', message: String(err) }); }
 }
 
 function importSalesXlsxBlob_(blob, fileName) {

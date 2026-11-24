@@ -31,6 +31,7 @@ function setup() {
     getOrCreateSheet_(ss, DATASETS[name].sheet, DATASETS[name].columns);
     updateDatasetRegistry_(ss, name, DATASETS[name], null);
   });
+  getOrCreateSheet_(ss, '_senders', ['email', 'note']); // відправники звітів поштою (GmailImport.js)
   // користувачі дашборду: власник додається автоматично
   var us = getOrCreateSheet_(ss, AUTH.USERS_SHEET, ['email', 'name', 'active', 'added', 'password']);
   var owner = '';

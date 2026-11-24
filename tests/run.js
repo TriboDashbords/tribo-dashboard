@@ -59,14 +59,21 @@ const G = {
   },
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: s => ({ setMimeType() { return { text: s }; } }) },
   HtmlService: { createHtmlOutput: h => ({ setTitle() { return this; }, addMetaTag() { return this; }, html: h }) },
-  DriveApp: {}, ScriptApp: {}
+  DriveApp: {}, ScriptApp: {},
+  GmailApp: (function () {
+    const labels = {}; const mk = n => (labels[n] = labels[n] || { n, threads: [] });
+    const att = { getName: () => 'звіт.xlsx', copyBlob: () => ({}) };
+    const msg = { getFrom: () => 'Stranger <stranger@example.com>', getSubject: () => 'Звіт', getAttachments: () => [att] };
+    const th = { labels: [], getMessages: () => [msg], addLabel(l) { this.labels.push(l.n); }, markRead() {} };
+    return { _th: th, getUserLabelByName: n => labels[n] || null, createLabel: mk, search: () => [th] };
+  })()
 };
 
 // ---------- завантаження зібраного коду так само, як у loader/Code.gs ----------
 const triboLoad = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const src = triboLoad('dist/server.js');
 const names = Object.keys(G);
-const T = new Function(...names, 'triboLoad', src + '\n;return {TRIBO_API, generateTestPayloads_, ingestPayload_, validatePayload_, readXlsxTable_, parse1cSalesTable_, findKeyCaseInsensitive_, syncGroups_, getOrCreateSheet_, safeDeleteRows_, parsePlanFactTable_};')(...names.map(n => G[n]), triboLoad);
+const T = new Function(...names, 'triboLoad', src + '\n;return {TRIBO_API, generateTestPayloads_, ingestPayload_, validatePayload_, readXlsxTable_, parse1cSalesTable_, findKeyCaseInsensitive_, syncGroups_, getOrCreateSheet_, safeDeleteRows_, parsePlanFactTable_, processGmail_};')(...names.map(n => G[n]), triboLoad);
 
 console.log('1. Завантаження коду');
 ['doGet', 'doPost', 'api', 'processInbox', 'setup', 'onOpen', 'showToken', 'run'].forEach(f => ok(typeof T.TRIBO_API[f] === 'function', 'TRIBO_API.' + f));
@@ -175,6 +182,13 @@ console.log('6c. План-факт (вигадані дані)');
   // повторне завантаження з іншим написанням організації не дублює рядки
   const p2 = JSON.parse(JSON.stringify(r.payloads[0])); p2.organization = '"ORG"'; p2.rows.forEach(x => x.organization = '"ORG"');
   ok(T.ingestPayload_(p2, 'test').ok && SS.getSheetByName('planfact').getLastRow() - 1 === 4, 'інше написання організації — заміна без дублів');
+}
+
+console.log('6d. Пошта: листи від невідомих відправників не обробляються');
+{
+  const n = T.processGmail_(Date.now());
+  const last = SS.getSheetByName('_log').data.filter(r => r && r[1] === 'gmail').pop();
+  ok(n === 0 && G.GmailApp._th.labels[0] === 'tribo-error' && /_senders/.test(last[9]), 'чужий лист пропущено і позначено tribo-error');
 }
 
 console.log('7. Сторінка');

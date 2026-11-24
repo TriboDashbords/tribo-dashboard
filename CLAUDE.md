@@ -13,6 +13,14 @@
 - Заглушки в loader: doGet, doPost, api, processInbox (тригер кожні 15 хв), setup, showToken, run, onOpen. Нових додати не можна без участі користувача.
 - Зміни в `loader/` або в манифесті (`loader/appsscript.json`, нові OAuth-скоупи) потребують ручної вставки користувачем + нової версії розгортання. Уникай.
 
+## Дані й автоматика
+- Набори: `sales` (звіт «Продажи»), `planfact` + `planfact_clients` (звіт «Собівартість»/план-факт, вкладка «Собівартість» — лише факт).
+- Завантаження: (1) папка Drive `Inbox`; (2) пошта власника — листи з .xlsx від адрес з аркуша `_senders` (GmailImport.js, мітки tribo-done/tribo-error);
+  (3) POST JSON з 1С. Усе — через `ingestPayload_` (replace_period, організація порівнюється без лапок — `orgKey_`).
+- У Claude можуть бути підключені Google Drive/Sheets (акаунт tribodashbords): ними можна читати `_log`, `_control`, `_datasets` для перевірок
+  і дописувати адреси в `_senders`/`_users` (паролі — лише якщо користувач сам попросив). Великі бінарні файли через конектор не завантажуються.
+- Внизу сторінки — «версія …» (час збірки), щоб перевірити, що в браузері вже нова версія.
+
 ## Робочий процес
 1. Редагуй `src/server/*.js` і `src/web/index.html`.
 2. `node build.js && node tests/run.js` — усі перевірки мають пройти (імітація Apps Script у tests/run.js).

@@ -207,7 +207,9 @@
   .gbar i { display: block; height: 100%; background: var(--bar); border-radius: 4px; }
   .cg { padding-left: 14px; }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 14px; font-size: 12px; color: var(--text-2); }
-  .lg { display: inline-flex; align-items: center; gap: 5px; }
+  .lg { display: inline-flex; align-items: center; gap: 5px; background: none; border: 0; padding: 3px 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+  .lg:hover { text-decoration: underline; }
+  .vals .mg { font-size: 12px; color: var(--text-2); }
   .lg i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
   .lg b { color: var(--text); font-weight: 600; }
   .cg-row { padding: 8px 2px; font-size: 14px; }
@@ -661,7 +663,7 @@
     var h = '<h2>Групи продуктів</h2><div class="pfpie"><canvas id="pfPie" role="img" aria-label="Кругова діаграма продажів за групами"></canvas>' +
       '<div class="center"><div class="v num">' + tys(t) + '</div><div class="l">тис. грн</div></div></div>';
     h += '<div class="legend">' + pfSlices(d).map(function (x) {
-      return '<span class="lg"><i style="background:' + x.color + '"></i>' + esc(x.n.replace(/^\([\d.]+\)\s*-?\s*/, '')) + ' <b class="num">' + pct(x.f, t) + '</b></span>';
+      return '<button class="lg" data-lg="' + esc(x.n) + '"><i style="background:' + x.color + '"></i>' + esc(x.n.replace(/^\([\d.]+\)\s*-?\s*/, '')) + ' <b class="num">' + pct(x.f, t) + '</b></button>';
     }).join('') + '</div>';
     h += '<div class="thead"><span>Група</span><span>тис. грн · рентаб.</span></div>';
     d.groups.forEach(function (g, i) {
@@ -735,7 +737,7 @@
         (c.rg && c.rg !== 'Украина' ? ' <span class="badge">' + esc(c.rg) + '</span>' : '') +
         '<span class="gbar"><i style="width:' + Math.max(1.5, c.f / max * 100).toFixed(1) + '%"></i></span>' +
         '<span class="sub">' + pct(c.f, t) + ' · рентаб. ' + rentTxt(c) + '</span></span>' +
-        '<span class="vals num"><b>' + tys(c.f) + '</b></span><span class="caret">' + (open ? '▾' : '▸') + '</span></button>';
+        '<span class="vals num"><b>' + tys(c.f) + '</b><span class="mg' + (c.pr < 0 ? ' neg' : '') + '">маржа ' + tys(c.pr) + '</span></span><span class="caret">' + (open ? '▾' : '▸') + '</span></button>';
       if (open) {
         c.g.forEach(function (g) {
           var gk = c.key + '|' + g.n, go = PF.cgopen[gk] !== false; // групи клієнта розгорнуті за замовчуванням
@@ -754,6 +756,15 @@
   function bindPF(d) {
     var gbox = document.getElementById('pfgroups');
     gbox.onclick = function (e) {
+      var lg = e.target.closest('[data-lg]');
+      if (lg) { // клік у легенді: відкрити групу і прокрутити до неї («Інше» — до списку)
+        var ln = lg.getAttribute('data-lg');
+        if (ln !== 'Інше') PF.gopen[ln] = true;
+        gbox.innerHTML = pfGroupsHtml(d); drawPFPie(d);
+        var target = ln === 'Інше' ? gbox.querySelector('.thead') : gbox.querySelector('[data-g="' + CSS.escape(ln) + '"]');
+        if (target) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        return;
+      }
       var b = e.target.closest('[data-g]'); if (!b) return;
       var n = b.getAttribute('data-g'); PF.gopen[n] = !PF.gopen[n];
       gbox.innerHTML = pfGroupsHtml(d); drawPFPie(d);

@@ -50,7 +50,7 @@ function parsePlanFactTable_(rows, opts) {
       var v = String(c[j] === undefined ? '' : c[j]).trim().toLowerCase();
       if (/^период с/.test(v)) from = pfDate_(c[j + 1]);
       if (/^по:?$/.test(v)) to = pfDate_(c[j + 1]);
-      if (/^организация/.test(v) && c[j + 1]) org = String(c[j + 1]).trim();
+      if (/^организация/.test(v) && c[j + 1] && orgKey_(c[j + 1]) !== orgKey_(org)) org = String(c[j + 1]).trim(); // інша організація
     }
   }
   if (!from || !to) errors.push('не знайдено період ("Период с … по …")');

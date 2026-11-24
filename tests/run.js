@@ -172,6 +172,9 @@ console.log('6c. План-факт (вигадані дані)');
   const c1 = v.clients.find(c => c.n === 'Клієнт 2'), c0 = v.clients.find(c => c.n === 'Клієнт 1');
   ok(c1 && c1.debt === -50 && c1.g[0].it[0].pr === 800 && c0.debt === 100, 'клієнт: борг, групи і продукти');
   ok(v.clients[0].f >= v.clients[1].f, 'клієнти від більшого до меншого');
+  // повторне завантаження з іншим написанням організації не дублює рядки
+  const p2 = JSON.parse(JSON.stringify(r.payloads[0])); p2.organization = '"ORG"'; p2.rows.forEach(x => x.organization = '"ORG"');
+  ok(T.ingestPayload_(p2, 'test').ok && SS.getSheetByName('planfact').getLastRow() - 1 === 4, 'інше написання організації — заміна без дублів');
 }
 
 console.log('7. Сторінка');

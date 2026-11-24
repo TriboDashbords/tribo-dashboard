@@ -85,7 +85,7 @@ function saveControl_(ss, c) {
     var vals = sh.getRange(2, 1, last - 1, 4).getDisplayValues();
     for (var i = vals.length - 1; i >= 0; i--) {
       var v = vals[i];
-      var overlap = v[0] === c.dataset && v[1] === c.organization &&
+      var overlap = v[0] === c.dataset && orgKey_(v[1]) === orgKey_(c.organization) &&
         !(v[3] < c.period_from || v[2] > c.period_to);
       if (overlap) safeDeleteRows_(sh, i + 2, 1);
     }
@@ -118,7 +118,7 @@ function replacePeriod_(ss, ds, organization, periodFrom, periodTo, rows) {
     var runs = [], start = -1;
     for (var i = 0; i < pVals.length; i++) {
       var m = String(pVals[i][0]).slice(0, 7);
-      var hit = m >= fromM && m <= toM && oVals[i][0] === organization;
+      var hit = m >= fromM && m <= toM && orgKey_(oVals[i][0]) === orgKey_(organization);
       if (hit && start < 0) start = i;
       if (!hit && start >= 0) { runs.push([start, i - 1]); start = -1; }
       if (hit) deleted++;
@@ -130,7 +130,7 @@ function replacePeriod_(ss, ds, organization, periodFrom, periodTo, rows) {
       var all = sh.getRange(2, 1, last - 1, headers.length).getValues();
       var keep = all.filter(function (r, idx) {
         var m2 = String(pVals[idx][0]).slice(0, 7);
-        return !(m2 >= fromM && m2 <= toM && oVals[idx][0] === organization);
+        return !(m2 >= fromM && m2 <= toM && orgKey_(oVals[idx][0]) === orgKey_(organization));
       });
       sh.getRange(2, 1, last - 1, headers.length).clearContent();
       if (keep.length) writeRows_(sh, ds, 2, keep);
@@ -154,6 +154,9 @@ function writeRows_(sh, ds, startRow, rows) {
   range.setNumberFormats(rows.map(function () { return formats; }));
   range.setValues(rows);
 }
+
+/** Порівняння назв організацій без лапок, пробілів і регістру ("ТРІБО"" і "ТРІБО" — та сама). */
+function orgKey_(s) { return String(s || '').replace(/["«»'„“”\s]/g, '').toLowerCase(); }
 
 /** Кількість клітинок у Таблиці (ліміт Google — 10 млн). */
 function countCells_(ss) {

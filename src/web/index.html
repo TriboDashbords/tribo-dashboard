@@ -97,6 +97,8 @@
   .btn:disabled { opacity: .6; }
   .login { max-width: 420px; margin: 24px auto; }
   .login p { margin: 0 0 12px; }
+  .login .search { margin-bottom: 10px; }
+  .login .lnk { display: block; margin-top: 12px; }
   .login .status { margin-top: 12px; }
   input.code { font-size: 24px; letter-spacing: 8px; text-align: center; }
   .upd .lnk { font-size: 12px; padding: 0; }
@@ -162,15 +164,22 @@
     }).catch(showError);
   }
 
-  // Вхід за кодом із пошти
+  // Вхід: пошта + пароль (step 'pw'); запасний шлях — код на пошту (steps 1, 2)
   function showLogin(step, email, msg) {
+    step = step || 'pw';
     document.getElementById('upd').innerHTML = '';
     email = email || lsGet(EMAIL_KEY);
     var h = '<section class="card login"><h2>Вхід у дашборд</h2>';
-    if (step !== 2) {
+    if (step === 'pw') {
+      h += '<input class="search" id="lemail" type="email" inputmode="email" autocomplete="username" placeholder="Пошта" value="' + esc(email) + '">' +
+        '<input class="search" id="lpass" type="password" autocomplete="current-password" placeholder="Пароль">' +
+        '<button class="btn primary full" id="lgo">Увійти</button>' +
+        '<button class="lnk" id="lcodeway">Немає пароля? Увійти за кодом із пошти</button>';
+    } else if (step === 1) {
       h += '<p class="muted">Введіть свою пошту — надішлемо код входу.</p>' +
-        '<input class="search" id="lemail" type="email" inputmode="email" autocomplete="email" placeholder="пошта@приклад.com" value="' + esc(email) + '">' +
-        '<button class="btn primary full" id="lsend">Отримати код</button>';
+        '<input class="search" id="lemail" type="email" inputmode="email" autocomplete="email" placeholder="Пошта" value="' + esc(email) + '">' +
+        '<button class="btn primary full" id="lsend">Отримати код</button>' +
+        '<button class="lnk" id="lpwway">← Увійти з паролем</button>';
     } else {
       h += '<p class="muted">Код надіслано на <b>' + esc(email) + '</b>, якщо цій адресі дозволено вхід. Перевірте також «Спам».</p>' +
         '<input class="search code" id="lcode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 цифр">' +
@@ -180,8 +189,21 @@
     if (msg) h += '<div class="status bad" role="alert"><span aria-hidden="true">⚠</span><div>' + esc(msg) + '</div></div>';
     h += '</section>';
     app.innerHTML = h;
-    if (step !== 2) {
-      var inp = document.getElementById('lemail'), btn = document.getElementById('lsend');
+    var $ = function (id) { return document.getElementById(id); };
+    if (step === 'pw') {
+      var go0 = function () {
+        var em = $('lemail').value.trim(), pw = $('lpass').value;
+        if (!em || !pw) return;
+        $('lgo').disabled = true; $('lgo').textContent = 'Перевіряємо…';
+        rpc('login', [em, pw]).then(function (r) { lsSet(EMAIL_KEY, em); setToken(r.token); start(); })
+          .catch(function (e) { showLogin('pw', em, e && e.message || String(e)); });
+      };
+      $('lgo').onclick = go0;
+      $('lpass').onkeydown = $('lemail').onkeydown = function (e) { if (e.key === 'Enter') go0(); };
+      $('lcodeway').onclick = function () { showLogin(1, $('lemail').value.trim()); };
+      (email ? $('lpass') : $('lemail')).focus();
+    } else if (step === 1) {
+      var inp = $('lemail'), btn = $('lsend');
       var go = function () {
         var em = inp.value.trim(); if (!em) return;
         btn.disabled = true; btn.textContent = 'Надсилаємо…';
@@ -189,8 +211,9 @@
           .catch(function (e) { showLogin(1, em, e && e.message || String(e)); });
       };
       btn.onclick = go; inp.onkeydown = function (e) { if (e.key === 'Enter') go(); }; inp.focus();
+      $('lpwway').onclick = function () { showLogin('pw', inp.value.trim()); };
     } else {
-      var c = document.getElementById('lcode'), ok = document.getElementById('lok');
+      var c = $('lcode'), ok = $('lok');
       var go2 = function () {
         var code = c.value.replace(/\D/g, ''); if (code.length < 6) return;
         ok.disabled = true; ok.textContent = 'Перевіряємо…';
@@ -199,13 +222,13 @@
       };
       ok.onclick = go2; c.oninput = function () { if (c.value.replace(/\D/g, '').length === 6) go2(); };
       c.onkeydown = function (e) { if (e.key === 'Enter') go2(); }; c.focus();
-      document.getElementById('lback').onclick = function () { showLogin(1, email); };
+      $('lback').onclick = function () { showLogin(1, email); };
     }
   }
 
-  function logout() { var t = getToken(); setToken(''); rpc('logout', [t]).catch(function () {}); showLogin(1); }
+  function logout() { var t = getToken(); setToken(''); rpc('logout', [t]).catch(function () {}); showLogin('pw'); }
 
-  if (getToken()) start(); else showLogin(1);
+  if (getToken()) start(); else showLogin('pw');
 
   function showError(e) {
     app.innerHTML = '<div class="card status bad err"><span aria-hidden="true">⚠</span><div><b>Помилка.</b> ' + esc(e && e.message || e) + '</div></div>';

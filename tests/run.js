@@ -12,6 +12,8 @@ class Range {
   _chk() { if (this.r + this.nr - 1 > this.sh.maxRows) throw new Error('out of bounds rows'); }
   getValues() { const o = []; for (let i = 0; i < this.nr; i++) { const row = []; for (let j = 0; j < this.nc; j++) { const v = (this.sh.data[this.r - 1 + i] || [])[this.c - 1 + j]; row.push(v === undefined ? '' : v); } o.push(row); } return o; }
   getDisplayValues() { return this.getValues().map(r => r.map(fmtCell)); }
+  getValue() { return this.getValues()[0][0]; }
+  setValue(v) { return this.setValues([[v]]); }
   setValues(v) { this._chk(); for (let i = 0; i < this.nr; i++) { const rr = this.sh.data[this.r - 1 + i] || (this.sh.data[this.r - 1 + i] = []); for (let j = 0; j < this.nc; j++) rr[this.c - 1 + j] = v[i][j]; } return this; }
   setNumberFormats() { return this; } setNumberFormat() { return this; } setFontWeight() { return this; }
   clearContent() { for (let i = 0; i < this.nr; i++) { const rr = this.sh.data[this.r - 1 + i]; if (rr) for (let j = 0; j < this.nc; j++) rr[this.c - 1 + j] = ''; } return this; }
@@ -70,8 +72,8 @@ console.log('1. Завантаження коду');
 
 console.log('2. Прийом тестових даних');
 store.props.set('SPREADSHEET_ID', 'TEST_SS'); store.props.set('TOKEN', 'secret');
-const users = T.getOrCreateSheet_(SS, '_users', ['email', 'name', 'active', 'added']);
-users.appendRow(['Owner@Example.com', 'Власник', 'так', '']);
+const users = T.getOrCreateSheet_(SS, '_users', ['email', 'name', 'active', 'added', 'password']);
+users.appendRow(['Owner@Example.com', 'Власник', 'так', '', 'Pa55word']);
 users.appendRow(['blocked@example.com', 'X', 'ні', '']);
 const P = T.generateTestPayloads_();
 P.forEach(p => { const r = T.ingestPayload_(p, 'test'); if (!r.ok) console.log(r); });
@@ -108,6 +110,14 @@ ok(sess.token && sess.token.length >= 32, 'видано токен сесії');
 let e3 = null; try { api('verifyCode', ['owner@example.com', code]); } catch (e) { e3 = e.message; }
 ok(!!e3, 'код одноразовий');
 
+console.log('4b. Вхід за паролем');
+let e5 = null; try { api('login', ['owner@example.com', 'wrong']); } catch (e) { e5 = e.message; }
+ok(e5 === 'Невірна пошта або пароль', 'невірний пароль відхиляється');
+let e6 = null; try { api('login', ['blocked@example.com', '']); } catch (e) { e6 = e.message; }
+ok(e6 === 'Невірна пошта або пароль', 'заблокований / без пароля — відмова');
+const s2 = api('login', [' OWNER@example.com', 'Pa55word']);
+ok(api('init', [s2.token]).yearPeriod.total > 0, 'вхід за паролем дає доступ до даних');
+
 console.log('5. Дані дашборду');
 const init = api('init', [sess.token]);
 const yr = init.yearPeriod;
@@ -128,7 +138,7 @@ ok(e4 === 'AUTH_REQUIRED', 'після виходу токен недійсни�
 
 console.log('7. Сторінка');
 const page = T.TRIBO_API.doGet({ parameter: {} });
-ok(/Вхід у дашборд/.test(page.html) && /google\.script\.run/.test(page.html), 'doGet віддає сторінку зі входом');
+ok(/Вхід у дашборд/.test(page.html) && /Пароль/.test(page.html) && /google\.script\.run/.test(page.html), 'doGet віддає сторінку зі входом');
 ok(/"ok":true/.test(T.TRIBO_API.doGet({ parameter: { health: '1' } }).text), '?health=1 відповідає');
 
 console.log('8. Розбір Excel 1С (синтетичний файл, якщо є tests/fixtures)');

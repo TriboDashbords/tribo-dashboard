@@ -32,7 +32,7 @@ function setup() {
     updateDatasetRegistry_(ss, name, DATASETS[name], null);
   });
   // користувачі дашборду: власник додається автоматично
-  var us = getOrCreateSheet_(ss, AUTH.USERS_SHEET, ['email', 'name', 'active', 'added']);
+  var us = getOrCreateSheet_(ss, AUTH.USERS_SHEET, ['email', 'name', 'active', 'added', 'password']);
   var owner = '';
   try { owner = Session.getEffectiveUser().getEmail(); } catch (e) {}
   if (owner && us.getLastRow() < 2) us.appendRow([owner, 'Власник', 'так', nowIso_()]);

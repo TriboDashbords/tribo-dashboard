@@ -1,8 +1,9 @@
 /**
  * Auth.js — вхід у дашборд за кодом із пошти (без входу в Google).
  *
- * Хто може входити — аркуш "_users" у Таблиці: email | name | active (так/ні) | added.
- * Щоб додати людину — допишіть рядок з її поштою і "так". Щоб забрати доступ — поставте "ні".
+ * Хто може входити — аркуш "_users" у Таблиці: email | name | active (так/ні) | added | password.
+ * Щоб додати людину — допишіть рядок: пошта, ім'я, "так", (дата — необов'язково), пароль.
+ * Щоб забрати доступ — поставте "ні". Вхід: пошта + пароль; якщо пароля немає — код на пошту.
  * Сесія живе AUTH.SESSION_DAYS днів; зберігається в Script Properties як хеш токена.
  */
 
@@ -11,7 +12,8 @@ var AUTH = {
   CODE_TTL_SEC: 600,        // код дійсний 10 хв
   MAX_CODES_PER_HOUR: 5,    // захист від розсилки
   MAX_ATTEMPTS: 5,          // спроб ввести код
-  SESSION_DAYS: 90
+  SESSION_DAYS: 90,
+  MAX_PASSWORD_TRIES: 10   // за 15 хв
 };
 
 var AUTH_REQUIRED = 'AUTH_REQUIRED';
@@ -23,14 +25,22 @@ function sha_(s) {
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)).replace(/=+$/, '');
 }
 
-/** {email: name} для активних користувачів. */
-function allowedUsers_() {
+/** {email: {name, password}} для активних користувачів. */
+function usersTable_() {
   var sh = getSpreadsheet_().getSheetByName(AUTH.USERS_SHEET), out = {};
   if (!sh || sh.getLastRow() < 2) return out;
-  sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues().forEach(function (r) {
+  if (String(sh.getRange(1, 5).getValue()) === '') sh.getRange(1, 5).setValue('password');
+  sh.getRange(2, 1, sh.getLastRow() - 1, 5).getDisplayValues().forEach(function (r) {
     var e = normEmail_(r[0]), active = String(r[2]).trim().toLowerCase();
-    if (e && active !== 'ні' && active !== 'no' && active !== 'нет') out[e] = String(r[1] || '');
+    if (e && active !== 'ні' && active !== 'no' && active !== 'нет') out[e] = { name: String(r[1] || ''), password: String(r[4] || '') };
   });
+  return out;
+}
+
+/** {email: name} для активних користувачів. */
+function allowedUsers_() {
+  var t = usersTable_(), out = {};
+  Object.keys(t).forEach(function (e) { out[e] = t[e].name; });
   return out;
 }
 
@@ -82,12 +92,33 @@ function authVerify_(email, code) {
   var users = allowedUsers_();
   if (users[email] === undefined) throw new Error('Доступ не надано');
 
+  return newSession_(email, users[email], 'код');
+}
+
+function newSession_(email, name, how) {
   var token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
   var props = PropertiesService.getScriptProperties();
   props.setProperty('S_' + sha_(token), JSON.stringify({ e: email, x: Date.now() + AUTH.SESSION_DAYS * 864e5 }));
   cleanupSessions_(props);
-  log_(getSpreadsheet_(), { source: 'auth', status: 'OK', message: 'Вхід: ' + email });
-  return { token: token, email: email, name: users[email] };
+  log_(getSpreadsheet_(), { source: 'auth', status: 'OK', message: 'Вхід (' + how + '): ' + email });
+  return { token: token, email: email, name: name };
+}
+
+/** Вхід за паролем із аркуша _users (стовпець password). */
+function authPassword_(email, password) {
+  email = normEmail_(email);
+  password = String(password || '');
+  var cache = CacheService.getScriptCache(), key = 'pw:' + sha_(email);
+  var n = parseInt(cache.get(key) || '0', 10);
+  if (n >= AUTH.MAX_PASSWORD_TRIES) throw new Error('Забагато невдалих спроб. Спробуйте через 15 хвилин.');
+  var u = usersTable_()[email];
+  if (!u || !u.password || password !== u.password) {
+    cache.put(key, String(n + 1), 900);
+    log_(getSpreadsheet_(), { source: 'auth', status: 'DENIED', message: 'Невдала спроба входу: ' + email });
+    throw new Error('Невірна пошта або пароль');
+  }
+  cache.remove(key);
+  return newSession_(email, u.name, 'пароль');
 }
 
 /** Перевірка токена для кожного запиту даних. Повертає email. */

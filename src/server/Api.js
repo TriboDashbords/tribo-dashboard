@@ -15,6 +15,7 @@ function doGet(e) {
 }
 
 var PUBLIC_API = {
+  login: function (email, password) { return authPassword_(email, password); },
   requestCode: function (email) { return authRequestCode_(email); },
   verifyCode: function (email, code) { return authVerify_(email, code); },
   logout: function (token) { return authLogout_(token); }

@@ -28,7 +28,7 @@ function apiInit() {
   return {
     year: year, currentMonth: month,
     months: y.summary.months, ytd: y.summary.total,
-    updated: y.summary.updated, staleHours: DCONFIG.STALE_HOURS,
+    updated: y.summary.updated, updatedPF: datasetUpdated_('planfact'), staleHours: DCONFIG.STALE_HOURS,
     groupOrder: y.summary.groupOrder, otherThreshold: DCONFIG.OTHER_THRESHOLD,
     period: getPeriodCached_(year, month, y),
     yearPeriod: getPeriodCached_(year, 0, y),
@@ -67,6 +67,12 @@ function getPeriodCached_(year, period, y) {
 }
 
 /** Версія даних: час останнього оновлення sales + відбиток аркуша _groups (ручні правки скидають кеш). */
+/** Час останнього оновлення набору (з _datasets). */
+function datasetUpdated_(name) {
+  var m = new RegExp('(?:^|;)' + name + '=([^;#]*)').exec(dataVersion_());
+  return m ? m[1] : '';
+}
+
 function dataVersion_() {
   var ss = getSpreadsheet_();
   var upd = '';

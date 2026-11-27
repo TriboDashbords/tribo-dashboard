@@ -31,6 +31,8 @@ var CONFIG = {
   INBOX_FOLDER_NAME: 'Inbox',
   INBOX_DONE_SUBFOLDER: 'Оброблено',
   INBOX_ERROR_SUBFOLDER: 'Помилки',
+  KEEP_DONE_HOURS: 24,      // скільки зберігати оброблені звіти в Inbox/Оброблено
+  KEEP_ERROR_HOURS: 168,    // скільки зберігати файли з помилками в Inbox/Помилки
 
   // Межа: якщо Таблиця перевищує цю кількість клітинок — попередження в _log
   CELLS_WARNING: 8000000
@@ -585,11 +587,7 @@ function processInbox() {
     if (Date.now() - started > 4 * 60 * 1000) break; // запас до ліміту 6 хв; решта — наступного разу
     var f = files.next();
     var name = f.getName();
-    if (!/\.xlsx$/i.test(name)) {
-      log_(ss, { source: 'excel', status: 'ERROR', message: name + ': потрібен формат .xlsx (у 1С: Зберегти як → Лист Excel 2007)' });
-      f.moveTo(bad);
-      continue;
-    }
+    if (!/\.xlsx$/i.test(name)) continue; // сторонні файли (не Excel) не чіпаємо і не засмічуємо журнал
     try {
       var result = importSalesXlsxBlob_(f.getBlob(), name);
       f.moveTo(result.ok ? done : bad);
@@ -599,8 +597,38 @@ function processInbox() {
     }
   }
 
+  // прибирання: оброблені файли зберігаються добу, з помилками — 7 днів, далі видаляються остаточно
+  try {
+    cleanupFolder_(done, CONFIG.KEEP_DONE_HOURS);
+    cleanupFolder_(bad, CONFIG.KEEP_ERROR_HOURS);
+  } catch (err) { log_(ss, { source: 'cleanup', status: 'ERROR', message: String(err) }); }
+
   // звіти, що 1С надсилає поштою (Розсилки звітів)
   try { processGmail_(started); } catch (err) { log_(ss, { source: 'gmail', status: 'ERROR', message: String(err) }); }
+}
+
+/** Остаточно видаляє файли папки, старші за maxAgeHours (не в Кошик, щоб не займати місце). */
+function cleanupFolder_(folder, maxAgeHours) {
+  var limit = Date.now() - maxAgeHours * 3600 * 1000, n = 0, started = Date.now();
+  var it = folder.getFiles();
+  while (it.hasNext() && Date.now() - started < 60 * 1000) {
+    var f = it.next();
+    if (f.getLastUpdated().getTime() > limit) continue;
+    deleteFileForever_(f.getId()) || f.setTrashed(true);
+    n++;
+  }
+  if (n) console.log('Видалено старих файлів: ' + n + ' з ' + folder.getName());
+  return n;
+}
+
+function deleteFileForever_(id) {
+  try {
+    var r = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id, {
+      method: 'delete', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }
+    });
+    return r.getResponseCode() === 204;
+  } catch (e) { return false; }
 }
 
 function importSalesXlsxBlob_(blob, fileName) {
@@ -1310,7 +1338,7 @@ function apiInit() {
   return {
     year: year, currentMonth: month,
     months: y.summary.months, ytd: y.summary.total,
-    updated: y.summary.updated, staleHours: DCONFIG.STALE_HOURS,
+    updated: y.summary.updated, updatedPF: datasetUpdated_('planfact'), staleHours: DCONFIG.STALE_HOURS,
     groupOrder: y.summary.groupOrder, otherThreshold: DCONFIG.OTHER_THRESHOLD,
     period: getPeriodCached_(year, month, y),
     yearPeriod: getPeriodCached_(year, 0, y),
@@ -1349,6 +1377,12 @@ function getPeriodCached_(year, period, y) {
 }
 
 /** Версія даних: час останнього оновлення sales + відбиток аркуша _groups (ручні правки скидають кеш). */
+/** Час останнього оновлення набору (з _datasets). */
+function datasetUpdated_(name) {
+  var m = new RegExp('(?:^|;)' + name + '=([^;#]*)').exec(dataVersion_());
+  return m ? m[1] : '';
+}
+
 function dataVersion_() {
   var ss = getSpreadsheet_();
   var upd = '';

@@ -231,7 +231,7 @@
   </header>
   <nav class="tabs" id="tabs"></nav>
   <div id="app"><div class="loading">Завантаження даних…</div></div>
-  <div class="ver">версія 2026-11-24 14:32 UTC</div>
+  <div class="ver">версія 2026-11-27 10:33 UTC</div>
 </div>
 
 <script>
@@ -352,7 +352,8 @@
   }
 
   function renderUpdated() {
-    var el = document.getElementById('upd'), u = S.init.updated;
+    var el = document.getElementById('upd'), u = S.tab === 'pf' ? (S.init.updatedPF || S.init.updated) : S.init.updated;
+    if (!el) return;
     if (!u) { el.innerHTML = '<span class="muted">Даних ще немає</span> · <button class="lnk" id="logout">Вийти</button>'; document.getElementById('logout').onclick = logout; return; }
     var d = new Date(u);
     var txt = 'Оновлено ' + ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' +
@@ -595,7 +596,7 @@
     el.innerHTML = '<button class="tab" data-t="sales" aria-pressed="' + (S.tab !== 'pf') + '">Продажі</button>' +
       '<button class="tab" data-t="pf" aria-pressed="' + (S.tab === 'pf') + '">Собівартість</button>';
     Array.prototype.forEach.call(el.querySelectorAll('.tab'), function (b) {
-      b.onclick = function () { var t = b.getAttribute('data-t'); if (t === S.tab) return; S.tab = t; lsSet('tribo_tab', t); render(); window.scrollTo(0, 0); };
+      b.onclick = function () { var t = b.getAttribute('data-t'); if (t === S.tab) return; S.tab = t; lsSet('tribo_tab', t); renderUpdated(); render(); window.scrollTo(0, 0); };
     });
   }
 

@@ -29,6 +29,8 @@ var CONFIG = {
   INBOX_FOLDER_NAME: 'Inbox',
   INBOX_DONE_SUBFOLDER: 'Оброблено',
   INBOX_ERROR_SUBFOLDER: 'Помилки',
+  KEEP_DONE_HOURS: 24,      // скільки зберігати оброблені звіти в Inbox/Оброблено
+  KEEP_ERROR_HOURS: 168,    // скільки зберігати файли з помилками в Inbox/Помилки
 
   // Межа: якщо Таблиця перевищує цю кількість клітинок — попередження в _log
   CELLS_WARNING: 8000000

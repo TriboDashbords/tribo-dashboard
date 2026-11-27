@@ -59,7 +59,7 @@ const G = {
   },
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: s => ({ setMimeType() { return { text: s }; } }) },
   HtmlService: { createHtmlOutput: h => ({ setTitle() { return this; }, addMetaTag() { return this; }, html: h }) },
-  DriveApp: {}, ScriptApp: {},
+  DriveApp: {}, ScriptApp: {}, UrlFetchApp: {},
   GmailApp: (function () {
     const labels = {}; const mk = n => (labels[n] = labels[n] || { n, threads: [] });
     const att = { getName: () => 'звіт.xlsx', copyBlob: () => ({}) };
@@ -73,7 +73,7 @@ const G = {
 const triboLoad = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const src = triboLoad('dist/server.js');
 const names = Object.keys(G);
-const T = new Function(...names, 'triboLoad', src + '\n;return {TRIBO_API, generateTestPayloads_, ingestPayload_, validatePayload_, readXlsxTable_, parse1cSalesTable_, findKeyCaseInsensitive_, syncGroups_, getOrCreateSheet_, safeDeleteRows_, parsePlanFactTable_, processGmail_};')(...names.map(n => G[n]), triboLoad);
+const T = new Function(...names, 'triboLoad', src + '\n;return {TRIBO_API, generateTestPayloads_, ingestPayload_, validatePayload_, readXlsxTable_, parse1cSalesTable_, findKeyCaseInsensitive_, syncGroups_, getOrCreateSheet_, safeDeleteRows_, parsePlanFactTable_, processGmail_, cleanupFolder_};')(...names.map(n => G[n]), triboLoad);
 
 console.log('1. Завантаження коду');
 ['doGet', 'doPost', 'api', 'processInbox', 'setup', 'onOpen', 'showToken', 'run'].forEach(f => ok(typeof T.TRIBO_API[f] === 'function', 'TRIBO_API.' + f));
@@ -206,6 +206,18 @@ if (fs.existsSync(fx)) {
   ok(res.errors.length === 0 && res.payloads.length > 0, 'Excel розібрано: ' + res.payloads.map(p => p.period_from + ':' + p.rows.length).join(', '));
   res.payloads.forEach(p => { const v = T.validatePayload_(p); ok(v.errors.length === 0, 'контрольна сума ' + p.period_from); });
 } else console.log('  (пропущено)');
+
+console.log('9. Прибирання старих файлів Inbox');
+{
+  const now = Date.now(), del = [];
+  const mk = (id, h) => ({ getId: () => id, getLastUpdated: () => new Date(now - h * 3600e3), setTrashed() { del.push('trash:' + id); } });
+  const list = [mk('old', 30), mk('new', 2)];
+  G.UrlFetchApp.fetch = (u) => { del.push(u.split('/').pop()); return { getResponseCode: () => 204 }; };
+  G.ScriptApp.getOAuthToken = () => 'tok';
+  let i = 0; const folder = { getName: () => 'Оброблено', getFiles: () => ({ hasNext: () => i < list.length, next: () => list[i++] }) };
+  const n = T.cleanupFolder_(folder, 24);
+  ok(n === 1 && del.join() === 'old', 'видалено лише файл, старший за 24 год');
+}
 
 console.log(failed ? `\nПОМИЛОК: ${failed}` : '\nУсі перевірки пройдено.');
 process.exit(failed ? 1 : 0);
